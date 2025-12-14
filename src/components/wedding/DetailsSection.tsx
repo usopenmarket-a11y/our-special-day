@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { weddingConfig } from "@/lib/weddingConfig";
-import { MapPin, Clock, Calendar, Heart } from "lucide-react";
+import { MapPin, Clock, Calendar, Church } from "lucide-react";
 
 const DetailsSection = () => {
   const weddingDate = new Date(weddingConfig.weddingDate);
@@ -10,11 +10,6 @@ const DetailsSection = () => {
     year: "numeric",
     month: "long",
     day: "numeric",
-  });
-  const formattedTime = weddingDate.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
   });
 
   return (
@@ -54,7 +49,7 @@ const DetailsSection = () => {
             </Card>
           </motion.div>
 
-          {/* Time Card */}
+          {/* Church Card */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -63,12 +58,23 @@ const DetailsSection = () => {
           >
             <Card className="p-8 text-center shadow-soft border-gold/10 h-full">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-gold/10 flex items-center justify-center">
-                <Clock className="w-7 h-7 text-gold" />
+                <Church className="w-7 h-7 text-gold" />
               </div>
               <h3 className="text-xl font-display font-medium text-foreground mb-2">
-                The Time
+                Church Ceremony
               </h3>
-              <p className="font-body text-muted-foreground">{formattedTime}</p>
+              <p className="font-body text-gold font-medium">{weddingConfig.church.time}</p>
+              <p className="font-body text-muted-foreground text-sm mt-1">
+                {weddingConfig.church.name}
+              </p>
+              <a
+                href={weddingConfig.church.mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-3 text-sm text-gold hover:underline font-body"
+              >
+                <MapPin className="w-3 h-3" /> View Map
+              </a>
             </Card>
           </motion.div>
 
@@ -81,17 +87,23 @@ const DetailsSection = () => {
           >
             <Card className="p-8 text-center shadow-soft border-gold/10 h-full">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-gold/10 flex items-center justify-center">
-                <MapPin className="w-7 h-7 text-gold" />
+                <Clock className="w-7 h-7 text-gold" />
               </div>
               <h3 className="text-xl font-display font-medium text-foreground mb-2">
-                The Venue
+                Reception
               </h3>
-              <p className="font-body text-muted-foreground">
+              <p className="font-body text-gold font-medium">{weddingConfig.venue.time}</p>
+              <p className="font-body text-muted-foreground text-sm mt-1">
                 {weddingConfig.venue.name}
               </p>
-              <p className="font-body text-muted-foreground text-sm mt-1">
-                {weddingConfig.venue.address}
-              </p>
+              <a
+                href={weddingConfig.venue.mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 mt-3 text-sm text-gold hover:underline font-body"
+              >
+                <MapPin className="w-3 h-3" /> View Map
+              </a>
             </Card>
           </motion.div>
         </div>
@@ -111,20 +123,23 @@ const DetailsSection = () => {
               {weddingConfig.schedule.map((item, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-6 py-4 border-b border-border/50 last:border-0"
+                  className="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 py-4 border-b border-border/50 last:border-0"
                 >
-                  <div className="flex-shrink-0 w-24 text-right">
+                  <div className="flex-shrink-0 md:w-24 md:text-right">
                     <span className="font-display font-medium text-gold">
                       {item.time}
                     </span>
                   </div>
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 hidden md:block">
                     <div className="w-3 h-3 rounded-full bg-gold/30 border-2 border-gold" />
                   </div>
                   <div className="flex-grow">
                     <span className="font-body text-lg text-foreground">
                       {item.event}
                     </span>
+                    {'location' in item && (
+                      <p className="font-body text-sm text-muted-foreground">{item.location}</p>
+                    )}
                   </div>
                 </div>
               ))}

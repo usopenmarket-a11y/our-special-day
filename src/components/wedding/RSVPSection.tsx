@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,31 +6,49 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Heart, X } from "lucide-react";
-
-// Demo guest list - this will be replaced with Google Sheets data
-const demoGuests = [
-  "Ahmed Hassan",
-  "Fatima Al-Rashid",
-  "Omar Khalil",
-  "Layla Ibrahim",
-  "Youssef Mansour",
-  "Nour El-Din",
-  "Salma Farouk",
-  "Karim Abdallah",
-];
+import { Check, Heart, X, Loader2, Search } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const RSVPSection = () => {
   const [selectedGuest, setSelectedGuest] = useState("");
   const [attendance, setAttendance] = useState<"attending" | "not-attending" | "">("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [guests, setGuests] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const { toast } = useToast();
 
-  const filteredGuests = demoGuests.filter((guest) =>
-    guest.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fetch guests from Google Sheets when search query changes
+  useEffect(() => {
+    const fetchGuests = async () => {
+      if (searchQuery.length < 2) {
+        setGuests([]);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('get-guests', {
+          body: { searchQuery }
+        });
+
+        if (error) {
+          console.error("Error fetching guests:", error);
+          return;
+        }
+
+        setGuests(data.guests || []);
+      } catch (err) {
+        console.error("Failed to fetch guests:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(fetchGuests, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +64,7 @@ const RSVPSection = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call - will be replaced with actual Google Sheets integration
+    // Simulate API call - can be extended to save RSVP to database
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     setIsSubmitting(false);
@@ -116,23 +134,30 @@ const RSVPSection = () => {
               {/* Guest Search */}
               <div className="space-y-4">
                 <Label className="text-base font-display">Find Your Name</Label>
-                <Input
-                  type="text"
-                  placeholder="Search for your name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="font-body"
-                />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search for your name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="font-body pl-10"
+                  />
+                  {isLoading && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold animate-spin" />
+                  )}
+                </div>
 
-                {searchQuery && filteredGuests.length > 0 && (
+                {searchQuery.length >= 2 && guests.length > 0 && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-lg bg-card">
-                    {filteredGuests.map((guest) => (
+                    {guests.map((guest, index) => (
                       <button
-                        key={guest}
+                        key={`${guest}-${index}`}
                         type="button"
                         onClick={() => {
                           setSelectedGuest(guest);
                           setSearchQuery("");
+                          setGuests([]);
                         }}
                         className={`p-3 text-left rounded-md font-body transition-colors ${
                           selectedGuest === guest
@@ -144,6 +169,12 @@ const RSVPSection = () => {
                       </button>
                     ))}
                   </div>
+                )}
+
+                {searchQuery.length >= 2 && !isLoading && guests.length === 0 && (
+                  <p className="text-sm text-muted-foreground font-body p-3 text-center border rounded-lg">
+                    No guests found matching "{searchQuery}"
+                  </p>
                 )}
 
                 {selectedGuest && (
