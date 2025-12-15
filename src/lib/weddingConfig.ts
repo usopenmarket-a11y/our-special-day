@@ -32,7 +32,16 @@ export const weddingConfig = {
   guestSheetId: "13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs",
   
   // Google Drive folder for guest uploads
-  uploadFolderId: "1dW9zf5S9z4nWJSm8IOKwe64sfvwzkQz1",
+  uploadFolderId: "1uTizlj_-8c6KqODuWcIr8N4VscIwYJJL",
+  
+  // Google Drive folder for gallery images
+  galleryFolderId: "1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D",
+  
+  // Bible verse
+  bibleVerse: {
+    text: "So they are no longer two, but one flesh. Therefore what God has joined together, let no one separate.",
+    reference: "Matthew 19:6 NIV",
+  },
   
   // Messages
   messages: {
