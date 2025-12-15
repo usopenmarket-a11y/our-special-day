@@ -1,53 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { weddingConfig } from "@/lib/weddingConfig";
 
-// Demo gallery images - will be replaced with Google Drive integration
-const demoImages = [
-  {
-    id: 1,
-    url: "https://images.unsplash.com/photo-1519741497674-611481863552?w=800&q=80",
-    alt: "Couple walking together",
-  },
-  {
-    id: 2,
-    url: "https://images.unsplash.com/photo-1529634806980-85c3dd6d34ac?w=800&q=80",
-    alt: "Romantic sunset",
-  },
-  {
-    id: 3,
-    url: "https://images.unsplash.com/photo-1606216794074-735e91aa2c92?w=800&q=80",
-    alt: "Beautiful flowers",
-  },
-  {
-    id: 4,
-    url: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?w=800&q=80",
-    alt: "Engagement moment",
-  },
-  {
-    id: 5,
-    url: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?w=800&q=80",
-    alt: "Wedding venue",
-  },
-  {
-    id: 6,
-    url: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?w=800&q=80",
-    alt: "Love story",
-  },
-];
+interface GalleryImage {
+  id: string;
+  name: string;
+  url: string;
+  fullUrl: string;
+  alt: string;
+}
 
 const GallerySection = () => {
+  const [images, setImages] = useState<GalleryImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchGallery = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.functions.invoke('get-gallery', {
+          body: { folderId: weddingConfig.galleryFolderId }
+        });
+
+        if (error) {
+          console.error('Error fetching gallery:', error);
+          setError('Unable to load gallery');
+          return;
+        }
+
+        if (data?.images) {
+          setImages(data.images);
+        }
+      } catch (err) {
+        console.error('Failed to fetch gallery:', err);
+        setError('Unable to load gallery');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGallery();
+  }, []);
 
   const handlePrevious = () => {
     if (selectedImage !== null) {
-      setSelectedImage(selectedImage === 0 ? demoImages.length - 1 : selectedImage - 1);
+      setSelectedImage(selectedImage === 0 ? images.length - 1 : selectedImage - 1);
     }
   };
 
   const handleNext = () => {
     if (selectedImage !== null) {
-      setSelectedImage(selectedImage === demoImages.length - 1 ? 0 : selectedImage + 1);
+      setSelectedImage(selectedImage === images.length - 1 ? 0 : selectedImage + 1);
     }
   };
 
@@ -72,40 +79,64 @@ const GallerySection = () => {
           </p>
         </motion.div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 text-gold animate-spin" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && (
+          <div className="text-center py-20">
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && images.length === 0 && (
+          <div className="text-center py-20">
+            <p className="text-muted-foreground">No photos yet. Check back soon!</p>
+          </div>
+        )}
+
         {/* Gallery Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {demoImages.map((image, index) => (
-            <motion.div
-              key={image.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`relative overflow-hidden rounded-lg cursor-pointer group ${
-                index === 0 ? "md:col-span-2 md:row-span-2" : ""
-              }`}
-              onClick={() => setSelectedImage(index)}
-            >
-              <div className={`aspect-square ${index === 0 ? "md:aspect-auto md:h-full" : ""}`}>
-                <img
-                  src={image.url}
-                  alt={image.alt}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-              </div>
-              <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/20 transition-colors duration-300" />
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="w-12 h-12 rounded-full bg-card/90 flex items-center justify-center">
-                  <span className="text-gold text-xl">+</span>
+        {!loading && images.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {images.map((image, index) => (
+              <motion.div
+                key={image.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className={`relative overflow-hidden rounded-lg cursor-pointer group ${
+                  index === 0 ? "md:col-span-2 md:row-span-2" : ""
+                }`}
+                onClick={() => setSelectedImage(index)}
+              >
+                <div className={`aspect-square ${index === 0 ? "md:aspect-auto md:h-full" : ""}`}>
+                  <img
+                    src={image.url}
+                    alt={image.alt}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    loading="lazy"
+                  />
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/20 transition-colors duration-300" />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="w-12 h-12 rounded-full bg-card/90 flex items-center justify-center">
+                    <span className="text-gold text-xl">+</span>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Lightbox */}
         <AnimatePresence>
-          {selectedImage !== null && (
+          {selectedImage !== null && images[selectedImage] && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -148,8 +179,8 @@ const GallerySection = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                src={demoImages[selectedImage].url}
-                alt={demoImages[selectedImage].alt}
+                src={images[selectedImage].fullUrl}
+                alt={images[selectedImage].alt}
                 className="max-w-full max-h-[85vh] object-contain rounded-lg"
                 onClick={(e) => e.stopPropagation()}
               />

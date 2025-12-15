@@ -1,1 +1,10 @@
 project_id = "ccwfazfmmhinjttskhrr"
+
+[functions.get-guests]
+verify_jwt = false
+
+[functions.get-gallery]
+verify_jwt = false
+
+[functions.upload-photo]
+verify_jwt = false

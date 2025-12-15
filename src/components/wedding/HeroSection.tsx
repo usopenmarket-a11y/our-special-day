@@ -74,15 +74,28 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="text-2xl md:text-3xl font-display font-medium text-foreground mb-12"
+          className="text-2xl md:text-3xl font-display font-medium text-foreground mb-8"
         >
           {formattedDate}
         </motion.p>
 
+        {/* Bible Verse */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
+          className="mb-12 max-w-2xl mx-auto"
+        >
+          <blockquote className="text-base md:text-lg font-body text-muted-foreground italic border-l-2 border-gold/50 pl-4">
+            "{weddingConfig.bibleVerse.text}"
+          </blockquote>
+          <p className="text-sm font-body text-gold mt-2">— {weddingConfig.bibleVerse.reference}</p>
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.7 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
         >
           <p className="text-sm font-body text-muted-foreground uppercase tracking-widest mb-6">
             Counting down to our special day

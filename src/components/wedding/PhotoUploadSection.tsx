@@ -3,7 +3,9 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image as ImageIcon, X, Check, Camera } from "lucide-react";
+import { Upload, X, Check, Camera } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { weddingConfig } from "@/lib/weddingConfig";
 
 interface UploadedFile {
   id: string;
@@ -80,22 +82,46 @@ const PhotoUploadSection = () => {
   const uploadFiles = async () => {
     if (files.length === 0) return;
 
-    // Update all files to uploading status
+    // Update all pending files to uploading status
     setFiles((prev) =>
       prev.map((f) => (f.status === "pending" ? { ...f, status: "uploading" as const } : f))
     );
 
-    // Simulate upload - will be replaced with Google Drive integration
+    // Upload each file
     for (const uploadFile of files) {
       if (uploadFile.status !== "uploading") continue;
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      try {
+        const formData = new FormData();
+        formData.append('file', uploadFile.file);
+        formData.append('folderId', weddingConfig.uploadFolderId);
 
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFile.id ? { ...f, status: "success" as const } : f
-        )
-      );
+        const { data, error } = await supabase.functions.invoke('upload-photo', {
+          body: formData,
+        });
+
+        if (error) {
+          console.error('Upload error:', error);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+        } else {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "success" as const } : f
+            )
+          );
+        }
+      } catch (err) {
+        console.error('Upload failed:', err);
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+          )
+        );
+      }
     }
 
     toast({
@@ -208,6 +234,8 @@ const PhotoUploadSection = () => {
                             ? "bg-foreground/50"
                             : uploadFile.status === "success"
                             ? "bg-sage/50"
+                            : uploadFile.status === "error"
+                            ? "bg-destructive/50"
                             : "bg-transparent group-hover:bg-foreground/30"
                         }`}
                       >
@@ -216,6 +244,9 @@ const PhotoUploadSection = () => {
                         )}
                         {uploadFile.status === "success" && (
                           <Check className="w-8 h-8 text-card" />
+                        )}
+                        {uploadFile.status === "error" && (
+                          <X className="w-8 h-8 text-card" />
                         )}
                         {uploadFile.status === "pending" && (
                           <button

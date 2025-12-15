@@ -1,73 +1,133 @@
-# Welcome to your Lovable project
+# Fady & Sandra Wedding Invitation
 
-## Project info
+A beautiful wedding invitation website for Fady & Sandra's special day on February 14, 2026.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- 💒 Church & Venue Details with Maps
+- 📅 Countdown Timer
+- 📝 RSVP with Guest Search (Google Sheets)
+- 📸 Photo Gallery (Google Drive)
+- 📤 Photo Upload for Guests
+- 📖 Bible Verse Display
 
-There are several ways of editing your application.
+## Local Installation
 
-**Use Lovable**
+### Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+- Node.js 18+ (install via [nvm](https://github.com/nvm-sh/nvm#installing-and-updating))
+- npm or bun
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Steps
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# 1. Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# 2. Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# 3. Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 4. Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Hosting on GitHub Pages
 
-**Use GitHub Codespaces**
+### Option 1: Manual Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. **Build the project:**
+   ```sh
+   npm run build
+   ```
 
-## What technologies are used for this project?
+2. **Configure base path** - Edit `vite.config.ts` and add base:
+   ```ts
+   export default defineConfig({
+     base: '/<REPO_NAME>/',
+     // ... rest of config
+   });
+   ```
 
-This project is built with:
+3. **Deploy the `dist` folder:**
+   ```sh
+   # Install gh-pages
+   npm install -D gh-pages
 
+   # Add to package.json scripts:
+   # "deploy": "gh-pages -d dist"
+
+   # Run deploy
+   npm run deploy
+   ```
+
+### Option 2: GitHub Actions (Automated)
+
+1. Create `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
+```
+
+2. Go to your repo **Settings → Pages → Source** and select **GitHub Actions**.
+
+3. Add secrets in **Settings → Secrets → Actions** for any environment variables.
+
+## Configuration
+
+Edit `src/lib/weddingConfig.ts` to customize:
+- Couple names
+- Wedding date
+- Church & Venue details
+- Google Sheet ID for guest list
+- Google Drive folder IDs
+
+## Technologies
+
+- React + TypeScript
 - Vite
-- TypeScript
-- React
-- shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- shadcn/ui
+- Framer Motion
+- Lovable Cloud (Backend)
