@@ -7,10 +7,23 @@ const corsHeaders = {
 
 // Helper: create/get OAuth2 access token using service account JSON stored in env
 async function getAccessToken(scopes: string) {
-  const saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
-  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or GOOGLE_SERVICE_ACCOUNT_JSON) not configured');
+  let saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
+  const saJsonB64 = Deno.env.get('SERVICE_ACCOUNT_JSON_B64');
+  if (!saJson && saJsonB64) {
+    try {
+      saJson = atob(saJsonB64);
+    } catch (err) {
+      throw new Error('Failed to decode SERVICE_ACCOUNT_JSON_B64');
+    }
+  }
+  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
 
-  const sa = JSON.parse(saJson);
+  let sa;
+  try {
+    sa = JSON.parse(saJson);
+  } catch (err) {
+    throw new Error('Invalid SERVICE_ACCOUNT_JSON content');
+  }
   const privateKeyPem = sa.private_key as string;
   const clientEmail = sa.client_email as string;
   if (!privateKeyPem || !clientEmail) throw new Error('Invalid service account JSON');

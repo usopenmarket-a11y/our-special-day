@@ -6,10 +6,23 @@ const corsHeaders = {
 };
 
 async function getAccessToken(scopes: string) {
-  const saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
-  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or GOOGLE_SERVICE_ACCOUNT_JSON) not configured');
+  let saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
+  const saJsonB64 = Deno.env.get('SERVICE_ACCOUNT_JSON_B64');
+  if (!saJson && saJsonB64) {
+    try {
+      saJson = atob(saJsonB64);
+    } catch (err) {
+      throw new Error('Failed to decode SERVICE_ACCOUNT_JSON_B64');
+    }
+  }
+  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
 
-  const sa = JSON.parse(saJson);
+  let sa;
+  try {
+    sa = JSON.parse(saJson);
+  } catch (err) {
+    throw new Error('Invalid SERVICE_ACCOUNT_JSON content');
+  }
   const privateKeyPem = sa.private_key as string;
   const clientEmail = sa.client_email as string;
   if (!privateKeyPem || !clientEmail) throw new Error('Invalid service account JSON');
@@ -66,27 +79,71 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    const folderId = (formData.get('folderId') as string) || Deno.env.get('UPLOAD_FOLDER_ID');
+    // Support two modes:
+    // 1) multipart/form-data (when invoked via direct HTTP with a file)
+    // 2) JSON payload with base64 file (preferred when calling via supabase.functions.invoke)
+    let fileName: string | undefined;
+    let mimeType: string | undefined;
+    let fileBuffer: Uint8Array | undefined;
+    let folderId = Deno.env.get('UPLOAD_FOLDER_ID');
 
-    if (!file) throw new Error('File is required');
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const file = formData.get('file') as File | null;
+      folderId = (formData.get('folderId') as string) || folderId;
+      if (!file) throw new Error('File is required (multipart)');
+      fileName = file.name;
+      mimeType = file.type || 'application/octet-stream';
+      const ab = await file.arrayBuffer();
+      fileBuffer = new Uint8Array(ab);
+    } else {
+      // Expect JSON with base64 file
+      const json = await req.json();
+      const { fileName: fn, mimeType: mt, base64, folderId: fid } = json || {};
+      if (!base64 || !fn) throw new Error('Expected JSON payload { fileName, base64, mimeType?, folderId? }');
+      fileName = fn;
+      mimeType = mt || 'application/octet-stream';
+      folderId = fid || folderId;
+      // Decode base64
+      const raw = atob(base64);
+      const arr = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+      fileBuffer = arr;
+    }
+
+    if (!fileBuffer) throw new Error('No file data found');
     if (!folderId) throw new Error('folderId is required');
 
-    console.log(`Uploading file: ${file.name} to folder: ${folderId}`);
+    console.log(`Uploading file: ${fileName} to folder: ${folderId}`);
 
     const scopes = 'https://www.googleapis.com/auth/drive';
     const token = await getAccessToken(scopes);
 
-    // Build multipart form-data for Drive upload (metadata + file)
-    const metadata = { name: file.name, parents: [folderId] };
+    // Upload using multipart/related by constructing boundary payload
+    const boundary = '-------314159265358979323846';
+    const metadata = { name: fileName, parents: [folderId] };
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+
+    const base64Data = btoa(String.fromCharCode(...fileBuffer));
+    const multipartRequestBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      `Content-Type: ${mimeType}\r\n` +
+      'Content-Transfer-Encoding: base64\r\n\r\n' +
+      base64Data +
+      closeDelimiter;
+
     const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    const uploadResp = await fetch(uploadUrl, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body: multipartRequestBody,
+    });
 
-    const uploadForm = new FormData();
-    uploadForm.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    uploadForm.append('file', file, file.name);
-
-    const uploadResp = await fetch(uploadUrl, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: uploadForm });
     if (!uploadResp.ok) {
       const errorText = await uploadResp.text();
       console.error('Drive upload error:', errorText);

@@ -92,12 +92,22 @@ const PhotoUploadSection = () => {
       if (uploadFile.status !== "uploading") continue;
 
       try {
-        const formData = new FormData();
-        formData.append('file', uploadFile.file);
-        formData.append('folderId', weddingConfig.uploadFolderId);
+        // Read file as base64 and send JSON payload so supabase.functions.invoke works
+        const arrayBuffer = await uploadFile.file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        const base64 = btoa(binary);
+
+        const payload = {
+          fileName: uploadFile.file.name,
+          mimeType: uploadFile.file.type,
+          base64,
+          folderId: weddingConfig.uploadFolderId,
+        };
 
         const { data, error } = await supabase.functions.invoke('upload-photo', {
-          body: formData,
+          body: payload,
         });
 
         if (error) {
