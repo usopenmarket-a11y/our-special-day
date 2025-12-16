@@ -190,7 +190,7 @@ serve(async (req) => {
       base64Data +
       closeDelimiter;
 
-    const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true`;
     const uploadResp = await fetch(uploadUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
