@@ -80,7 +80,8 @@ const PhotoUploadSection = () => {
   };
 
   const uploadFiles = async () => {
-    if (files.length === 0) return;
+    const pending = files.filter((f) => f.status === "pending");
+    if (pending.length === 0) return;
 
     // Update all pending files to uploading status
     setFiles((prev) =>
@@ -88,14 +89,12 @@ const PhotoUploadSection = () => {
     );
 
     // Upload each file
-    for (const uploadFile of files) {
-      if (uploadFile.status !== "uploading") continue;
-
+    for (const uploadFile of pending) {
       try {
         // Read file as base64 and send JSON payload so supabase.functions.invoke works
         const arrayBuffer = await uploadFile.file.arrayBuffer();
         const uint8 = new Uint8Array(arrayBuffer);
-        let binary = '';
+        let binary = "";
         for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
         const base64 = btoa(binary);
 
@@ -106,37 +105,54 @@ const PhotoUploadSection = () => {
           folderId: weddingConfig.uploadFolderId,
         };
 
-        const { data, error } = await supabase.functions.invoke('upload-photo', {
+        const { data, error } = await supabase.functions.invoke("upload-photo", {
           body: payload,
         });
 
-        if (error) {
-          console.error('Upload error:', error);
+        const backendError =
+          error?.message ||
+          (typeof data === "object" && data && "success" in data && (data as any).success === false
+            ? (data as any).error
+            : undefined);
+
+        if (backendError) {
+          console.error("Upload error:", error ?? data);
           setFiles((prev) =>
             prev.map((f) =>
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
-        } else {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === uploadFile.id ? { ...f, status: "success" as const } : f
-            )
-          );
+          toast({
+            title: "Upload failed",
+            description: backendError,
+            variant: "destructive",
+          });
+          continue;
         }
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFile.id ? { ...f, status: "success" as const } : f
+          )
+        );
       } catch (err) {
-        console.error('Upload failed:', err);
+        console.error("Upload failed:", err);
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uploadFile.id ? { ...f, status: "error" as const } : f
           )
         );
+        toast({
+          title: "Upload failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
       }
     }
 
     toast({
-      title: "Photos uploaded! 📸",
-      description: "Thank you for sharing your memories with us.",
+      title: "Upload finished",
+      description: "If any photo failed, you'll see an error message above.",
     });
   };
 

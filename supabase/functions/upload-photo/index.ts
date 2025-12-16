@@ -200,7 +200,8 @@ serve(async (req) => {
     if (!uploadResp.ok) {
       const errorText = await uploadResp.text();
       console.error('Drive upload error:', errorText);
-      throw new Error(`Drive upload failed: ${uploadResp.status}`);
+      const snippet = errorText.length > 1200 ? `${errorText.slice(0, 1200)}…` : errorText;
+      throw new Error(`Drive upload failed (${uploadResp.status}): ${snippet}`);
     }
 
     const result = await uploadResp.json();
