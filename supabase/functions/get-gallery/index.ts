@@ -5,6 +5,54 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+async function getAccessToken(scopes: string): Promise<string> {
+  const serviceAccountJson = Deno.env.get('SERVICE_ACCOUNT_JSON');
+  if (!serviceAccountJson) throw new Error('SERVICE_ACCOUNT_JSON not configured');
+
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(serviceAccountJson);
+  } catch {
+    const cleaned = serviceAccountJson.replace(/\\n/g, '\n').replace(/\\/g, '');
+    serviceAccount = JSON.parse(cleaned);
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: serviceAccount.client_email,
+    scope: scopes,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  };
+
+  const encode = (obj: object) => btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const unsignedToken = `${encode(header)}.${encode(payload)}`;
+
+  const pemContents = serviceAccount.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', binaryKey, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(unsignedToken));
+  const signedToken = `${unsignedToken}.${btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+
+  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${signedToken}`,
+  });
+
+  const tokenData = await tokenResponse.json();
+  if (!tokenData.access_token) throw new Error(`Token error: ${JSON.stringify(tokenData)}`);
+  return tokenData.access_token;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -12,17 +60,18 @@ serve(async (req) => {
     const { folderId } = await req.json();
     if (!folderId) throw new Error('folderId is required');
 
-    const apiKey = Deno.env.get('GOOGLE_API_KEY');
-    if (!apiKey) throw new Error('GOOGLE_API_KEY not configured');
-
     console.log(`Fetching images from Google Drive folder: ${folderId}`);
 
-    // Use API key for publicly shared folders
+    const accessToken = await getAccessToken('https://www.googleapis.com/auth/drive.readonly');
+
     const query = `'${folderId}' in parents and mimeType contains 'image/' and trashed=false`;
     const fields = 'files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink)';
-    const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&key=${apiKey}`;
+    const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}`;
 
-    const response = await fetch(driveUrl);
+    const response = await fetch(driveUrl, {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Google Drive API error:', errorText);
