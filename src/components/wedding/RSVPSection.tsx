@@ -75,27 +75,36 @@ const RSVPSection = () => {
         body: {
           guestName: selectedGuest.name,
           attending: attendance === "attending",
-          rowIndex: selectedGuest.rowIndex
-        }
+          rowIndex: selectedGuest.rowIndex,
+        },
       });
 
-      if (error) {
-        console.error('Error saving RSVP:', error);
-        // Still show success since the response was received
+      if (error || data?.success === false) {
+        const description =
+          (data && (data.error || data.note)) ||
+          error?.message ||
+          "We couldn't save your RSVP. Please try again.";
+
+        toast({
+          title: "Couldn't save RSVP",
+          description,
+          variant: "destructive",
+        });
+        return;
       }
 
       setIsSubmitted(true);
       toast({
-        title: attendance === "attending" ? "See you there! 🎉" : "We'll miss you!",
+        title: attendance === "attending" ? "See you there!" : "We'll miss you",
         description: `Thank you for your response, ${selectedGuest.name}.`,
       });
     } catch (err) {
       console.error('Failed to save RSVP:', err);
       toast({
-        title: "Response received",
-        description: `Thank you, ${selectedGuest.name}. Your response has been noted.`,
+        title: "Couldn't save RSVP",
+        description: "Please try again in a moment.",
+        variant: "destructive",
       });
-      setIsSubmitted(true);
     } finally {
       setIsSubmitting(false);
     }

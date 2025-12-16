@@ -6,23 +6,61 @@ const corsHeaders = {
 };
 
 async function getAccessToken(scopes: string) {
-  let saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
+  let saJson =
+    Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') ||
+    Deno.env.get('SERVICE_ACCOUNT_JSON');
   const saJsonB64 = Deno.env.get('SERVICE_ACCOUNT_JSON_B64');
+
   if (!saJson && saJsonB64) {
     try {
       saJson = atob(saJsonB64);
-    } catch (err) {
+    } catch {
       throw new Error('Failed to decode SERVICE_ACCOUNT_JSON_B64');
     }
   }
-  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
 
-  let sa;
-  try {
-    sa = JSON.parse(saJson);
-  } catch (err) {
-    throw new Error('Invalid SERVICE_ACCOUNT_JSON content');
+  if (!saJson) {
+    throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
   }
+
+  const normalizeServiceAccountJson = (raw: string) => {
+    const trimmed = raw.trim();
+
+    // If user pasted base64 into SERVICE_ACCOUNT_JSON by mistake, try decoding it.
+    if (!trimmed.startsWith('{')) {
+      try {
+        const decoded = atob(trimmed);
+        if (decoded.trim().startsWith('{')) return decoded.trim();
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fix common issue: private_key is pasted with real newlines (invalid JSON).
+    if (trimmed.includes('"private_key"') && trimmed.includes('-----BEGIN PRIVATE KEY-----')) {
+      return trimmed.replace(
+        /("private_key"\s*:\s*")([\s\S]*?)(")/,
+        (_m, p1, val, p3) => `${p1}${String(val).replace(/\r?\n/g, '\\n')}${p3}`
+      );
+    }
+
+    return trimmed;
+  };
+
+  const normalized = normalizeServiceAccountJson(saJson);
+  console.log(
+    `Service account secret loaded (len=${normalized.length}, startsWithBrace=${normalized.trim().startsWith('{')})`
+  );
+
+  let sa: any;
+  try {
+    sa = JSON.parse(normalized);
+  } catch {
+    throw new Error(
+      'Invalid SERVICE_ACCOUNT_JSON content. Paste the full JSON key exactly as downloaded, or set SERVICE_ACCOUNT_JSON_B64 to a base64-encoded JSON.'
+    );
+  }
+
   const privateKeyPem = sa.private_key as string;
   const clientEmail = sa.client_email as string;
   if (!privateKeyPem || !clientEmail) throw new Error('Invalid service account JSON');
@@ -48,12 +86,27 @@ async function getAccessToken(scopes: string) {
   const payloadB64 = toBase64Url(payload);
   const unsigned = `${headerB64}.${payloadB64}`;
 
-  const pem = privateKeyPem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+  const pem = privateKeyPem.replace(
+    /-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g,
+    ''
+  );
   const derStr = atob(pem);
   const der = new Uint8Array(derStr.split('').map((c) => c.charCodeAt(0))).buffer;
 
-  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(unsigned));
+  const key = await crypto.subtle.importKey(
+    'pkcs8',
+    der,
+    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+
   const sigBytes = new Uint8Array(signature);
   let sigBase64 = '';
   for (let i = 0; i < sigBytes.length; i++) sigBase64 += String.fromCharCode(sigBytes[i]);

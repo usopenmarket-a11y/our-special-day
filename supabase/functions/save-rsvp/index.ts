@@ -9,21 +9,57 @@ const corsHeaders = {
 async function getAccessToken(scopes: string) {
   let saJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') || Deno.env.get('SERVICE_ACCOUNT_JSON');
   const saJsonB64 = Deno.env.get('SERVICE_ACCOUNT_JSON_B64');
+
   if (!saJson && saJsonB64) {
     try {
       saJson = atob(saJsonB64);
-    } catch (err) {
+    } catch {
       throw new Error('Failed to decode SERVICE_ACCOUNT_JSON_B64');
     }
   }
-  if (!saJson) throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
 
-  let sa;
-  try {
-    sa = JSON.parse(saJson);
-  } catch (err) {
-    throw new Error('Invalid SERVICE_ACCOUNT_JSON content');
+  if (!saJson) {
+    throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
   }
+
+  const normalizeServiceAccountJson = (raw: string) => {
+    const trimmed = raw.trim();
+
+    // If base64 was pasted into SERVICE_ACCOUNT_JSON by mistake, try decoding it.
+    if (!trimmed.startsWith('{')) {
+      try {
+        const decoded = atob(trimmed);
+        if (decoded.trim().startsWith('{')) return decoded.trim();
+      } catch {
+        // ignore
+      }
+    }
+
+    // Fix common issue: private_key pasted with real newlines (invalid JSON)
+    if (trimmed.includes('"private_key"') && trimmed.includes('-----BEGIN PRIVATE KEY-----')) {
+      return trimmed.replace(
+        /("private_key"\s*:\s*")([\s\S]*?)(")/,
+        (_m, p1, val, p3) => `${p1}${String(val).replace(/\r?\n/g, '\\n')}${p3}`
+      );
+    }
+
+    return trimmed;
+  };
+
+  const normalized = normalizeServiceAccountJson(saJson);
+  console.log(
+    `Service account secret loaded (len=${normalized.length}, startsWithBrace=${normalized.trim().startsWith('{')})`
+  );
+
+  let sa: any;
+  try {
+    sa = JSON.parse(normalized);
+  } catch {
+    throw new Error(
+      'Invalid SERVICE_ACCOUNT_JSON content. Paste the full JSON key exactly as downloaded, or set SERVICE_ACCOUNT_JSON_B64 to a base64-encoded JSON.'
+    );
+  }
+
   const privateKeyPem = sa.private_key as string;
   const clientEmail = sa.client_email as string;
   if (!privateKeyPem || !clientEmail) throw new Error('Invalid service account JSON');
