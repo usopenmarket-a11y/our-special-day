@@ -7,36 +7,70 @@ const corsHeaders = {
 
 // Get access token using OAuth refresh token (uses YOUR Google account quota)
 async function getAccessToken(): Promise<string> {
-  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
-  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
-  const refreshToken = Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN');
+  // IMPORTANT: trim to avoid hidden whitespace/newlines in secrets
+  const clientId = (Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') ?? '').trim();
+  const clientSecret = (Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') ?? '').trim();
+  const refreshToken = (Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN') ?? '').trim();
 
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error('Missing OAuth credentials: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, or GOOGLE_OAUTH_REFRESH_TOKEN');
+    throw new Error(
+      'Missing OAuth credentials: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, or GOOGLE_OAUTH_REFRESH_TOKEN'
+    );
   }
 
-  console.log('Refreshing OAuth access token...');
+  console.log(
+    `Refreshing OAuth access token... (clientIdLen=${clientId.length}, refreshTokenLen=${refreshToken.length})`
+  );
 
-  const resp = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    refresh_token: refreshToken,
+    grant_type: 'refresh_token',
+  }).toString();
 
-  if (!resp.ok) {
-    const txt = await resp.text();
-    console.error('OAuth token refresh failed:', txt);
-    throw new Error(`Failed to refresh access token: ${txt}`);
+  // Google sometimes returns {"error":"internal_failure"} transiently.
+  // We retry once and also try the legacy endpoint.
+  const endpoints = ['https://oauth2.googleapis.com/token', 'https://www.googleapis.com/oauth2/v4/token'];
+
+  let lastErrorText = '';
+
+  for (const tokenUrl of endpoints) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const resp = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          // Helpful for debugging/consistency; does not leak secrets.
+          'User-Agent': 'lovable-upload-photo/1.0',
+        },
+        body,
+      });
+
+      const txt = await resp.text();
+
+      if (resp.ok) {
+        const data = JSON.parse(txt);
+        if (!data?.access_token) throw new Error('Token endpoint response missing access_token');
+        console.log('OAuth token refreshed successfully');
+        return data.access_token as string;
+      }
+
+      lastErrorText = txt;
+      console.error(`OAuth token refresh failed (${resp.status}) via ${tokenUrl}:`, txt);
+
+      const isInternalFailure = txt.includes('internal_failure');
+      if (isInternalFailure && attempt === 0) {
+        // short backoff then retry once
+        await new Promise((r) => setTimeout(r, 800));
+        continue;
+      }
+
+      break;
+    }
   }
 
-  const data = await resp.json();
-  console.log('OAuth token refreshed successfully');
-  return data.access_token as string;
+  throw new Error(`Failed to refresh access token: ${lastErrorText || 'unknown_error'}`);
 }
 
 serve(async (req) => {
