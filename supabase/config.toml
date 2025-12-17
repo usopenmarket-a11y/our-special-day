@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.save-rsvp]
 verify_jwt = false
+
+[functions.test-token]
+verify_jwt = false
