@@ -5,126 +5,37 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function getAccessToken(scopes: string) {
-  let saJson =
-    Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON') ||
-    Deno.env.get('SERVICE_ACCOUNT_JSON');
-  const saJsonB64 = Deno.env.get('SERVICE_ACCOUNT_JSON_B64');
+// Get access token using OAuth refresh token (uses YOUR Google account quota)
+async function getAccessToken(): Promise<string> {
+  const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET');
+  const refreshToken = Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN');
 
-  if (!saJson && saJsonB64) {
-    try {
-      saJson = atob(saJsonB64);
-    } catch {
-      throw new Error('Failed to decode SERVICE_ACCOUNT_JSON_B64');
-    }
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Missing OAuth credentials: GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, or GOOGLE_OAUTH_REFRESH_TOKEN');
   }
 
-  if (!saJson) {
-    throw new Error('SERVICE_ACCOUNT_JSON (or SERVICE_ACCOUNT_JSON_B64) not configured');
-  }
+  console.log('Refreshing OAuth access token...');
 
-  const normalizeServiceAccountJson = (raw: string) => {
-    const trimmed = raw.trim();
-
-    // If user pasted base64 into SERVICE_ACCOUNT_JSON by mistake, try decoding it.
-    if (!trimmed.startsWith('{')) {
-      try {
-        const decoded = atob(trimmed);
-        if (decoded.trim().startsWith('{')) return decoded.trim();
-      } catch {
-        // ignore
-      }
-    }
-
-    // Fix common issue: private_key is pasted with real newlines (invalid JSON).
-    if (trimmed.includes('"private_key"') && trimmed.includes('-----BEGIN PRIVATE KEY-----')) {
-      return trimmed.replace(
-        /("private_key"\s*:\s*")([\s\S]*?)(")/,
-        (_m, p1, val, p3) => `${p1}${String(val).replace(/\r?\n/g, '\\n')}${p3}`
-      );
-    }
-
-    return trimmed;
-  };
-
-  const normalized = normalizeServiceAccountJson(saJson);
-  console.log(
-    `Service account secret loaded (len=${normalized.length}, startsWithBrace=${normalized.trim().startsWith('{')})`
-  );
-
-  let sa: any;
-  try {
-    sa = JSON.parse(normalized);
-  } catch {
-    throw new Error(
-      'Invalid SERVICE_ACCOUNT_JSON content. Paste the full JSON key exactly as downloaded, or set SERVICE_ACCOUNT_JSON_B64 to a base64-encoded JSON.'
-    );
-  }
-
-  const privateKeyPem = sa.private_key as string;
-  const clientEmail = sa.client_email as string;
-  if (!privateKeyPem || !clientEmail) throw new Error('Invalid service account JSON');
-
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: clientEmail,
-    scope: scopes,
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  };
-
-  const toBase64Url = (obj: any) => {
-    const s = JSON.stringify(obj);
-    const b = new TextEncoder().encode(s);
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(b)));
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-
-  const headerB64 = toBase64Url(header);
-  const payloadB64 = toBase64Url(payload);
-  const unsigned = `${headerB64}.${payloadB64}`;
-
-  const pem = privateKeyPem.replace(
-    /-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g,
-    ''
-  );
-  const derStr = atob(pem);
-  const der = new Uint8Array(derStr.split('').map((c) => c.charCodeAt(0))).buffer;
-
-  const key = await crypto.subtle.importKey(
-    'pkcs8',
-    der,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    key,
-    new TextEncoder().encode(unsigned)
-  );
-
-  const sigBytes = new Uint8Array(signature);
-  let sigBase64 = '';
-  for (let i = 0; i < sigBytes.length; i++) sigBase64 += String.fromCharCode(sigBytes[i]);
-  sigBase64 = btoa(sigBase64).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  const jwt = `${unsigned}.${sigBase64}`;
   const resp = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${encodeURIComponent(jwt)}`,
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
   });
 
   if (!resp.ok) {
     const txt = await resp.text();
-    throw new Error(`Failed to obtain access token: ${txt}`);
+    console.error('OAuth token refresh failed:', txt);
+    throw new Error(`Failed to refresh access token: ${txt}`);
   }
 
   const data = await resp.json();
+  console.log('OAuth token refreshed successfully');
   return data.access_token as string;
 }
 
@@ -132,9 +43,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    // Support two modes:
-    // 1) multipart/form-data (when invoked via direct HTTP with a file)
-    // 2) JSON payload with base64 file (preferred when calling via supabase.functions.invoke)
     let fileName: string | undefined;
     let mimeType: string | undefined;
     let fileBuffer: Uint8Array | undefined;
@@ -151,14 +59,12 @@ serve(async (req) => {
       const ab = await file.arrayBuffer();
       fileBuffer = new Uint8Array(ab);
     } else {
-      // Expect JSON with base64 file
       const json = await req.json();
       const { fileName: fn, mimeType: mt, base64, folderId: fid } = json || {};
       if (!base64 || !fn) throw new Error('Expected JSON payload { fileName, base64, mimeType?, folderId? }');
       fileName = fn;
       mimeType = mt || 'application/octet-stream';
       folderId = fid || folderId;
-      // Decode base64
       const raw = atob(base64);
       const arr = new Uint8Array(raw.length);
       for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
@@ -170,10 +76,8 @@ serve(async (req) => {
 
     console.log(`Uploading file: ${fileName} to folder: ${folderId}`);
 
-    const scopes = 'https://www.googleapis.com/auth/drive';
-    const token = await getAccessToken(scopes);
+    const token = await getAccessToken();
 
-    // Upload using multipart/related by constructing boundary payload
     const boundary = '-------314159265358979323846';
     const metadata = { name: fileName, parents: [folderId] };
     const delimiter = `\r\n--${boundary}\r\n`;
@@ -190,7 +94,7 @@ serve(async (req) => {
       base64Data +
       closeDelimiter;
 
-    const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true`;
+    const uploadUrl = `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
     const uploadResp = await fetch(uploadUrl, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
@@ -207,7 +111,7 @@ serve(async (req) => {
     const result = await uploadResp.json();
     console.log('File uploaded:', result.id);
 
-    // Optionally set the file to be viewable by anyone with the link (requires drive.permissions scope)
+    // Set public permission
     try {
       const permResp = await fetch(`https://www.googleapis.com/drive/v3/files/${result.id}/permissions`, {
         method: 'POST',
