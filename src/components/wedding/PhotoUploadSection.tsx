@@ -4,6 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, Image as ImageIcon, X, Check, Camera } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { weddingConfig } from "@/lib/weddingConfig";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface UploadedFile {
   id: string;
@@ -80,28 +85,75 @@ const PhotoUploadSection = () => {
   const uploadFiles = async () => {
     if (files.length === 0) return;
 
-    // Update all files to uploading status
+    const pendingFilesToUpload = files.filter((f) => f.status === "pending");
+    if (pendingFilesToUpload.length === 0) return;
+
+    // Update all pending files to uploading status
     setFiles((prev) =>
       prev.map((f) => (f.status === "pending" ? { ...f, status: "uploading" as const } : f))
     );
 
-    // Simulate upload - will be replaced with Google Drive integration
-    for (const uploadFile of files) {
-      if (uploadFile.status !== "uploading") continue;
+    let successCount = 0;
+    let errorCount = 0;
 
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Upload each file to Google Drive via Supabase Edge Function
+    for (const uploadFile of pendingFilesToUpload) {
+      try {
+        const formData = new FormData();
+        formData.append("file", uploadFile.file);
+        formData.append("folderId", weddingConfig.uploadFolderId);
 
-      setFiles((prev) =>
-        prev.map((f) =>
-          f.id === uploadFile.id ? { ...f, status: "success" as const } : f
-        )
-      );
+        // Use fetch directly for FormData uploads
+        const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-photo`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || `Upload failed: ${response.status}`);
+        }
+
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFile.id ? { ...f, status: "success" as const } : f
+          )
+        );
+        successCount++;
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+          )
+        );
+        errorCount++;
+      }
     }
 
-    toast({
-      title: "Photos uploaded! 📸",
-      description: "Thank you for sharing your memories with us.",
-    });
+    // Show toast based on results
+    if (successCount > 0 && errorCount === 0) {
+      toast({
+        title: "Photos uploaded! 📸",
+        description: `Successfully uploaded ${successCount} photo${successCount > 1 ? "s" : ""}. Thank you for sharing your memories with us.`,
+      });
+    } else if (successCount > 0 && errorCount > 0) {
+      toast({
+        title: "Partial upload complete",
+        description: `Uploaded ${successCount} photo${successCount > 1 ? "s" : ""}, but ${errorCount} failed. Please try again.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload photos. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const pendingFiles = files.filter((f) => f.status === "pending");
@@ -216,6 +268,11 @@ const PhotoUploadSection = () => {
                         )}
                         {uploadFile.status === "success" && (
                           <Check className="w-8 h-8 text-card" />
+                        )}
+                        {uploadFile.status === "error" && (
+                          <div className="text-destructive text-xs text-center px-2">
+                            Failed
+                          </div>
                         )}
                         {uploadFile.status === "pending" && (
                           <button
