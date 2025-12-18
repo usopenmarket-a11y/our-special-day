@@ -9,11 +9,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Heart, X, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+interface GuestInfo {
+  name: string;
+  rowIndex: number;
+}
+
 const RSVPSection = () => {
-  const [selectedGuest, setSelectedGuest] = useState("");
+  const [selectedGuest, setSelectedGuest] = useState<GuestInfo | null>(null);
   const [attendance, setAttendance] = useState<"attending" | "not-attending" | "">("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [guests, setGuests] = useState<string[]>([]);
+  const [guests, setGuests] = useState<GuestInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -64,16 +69,55 @@ const RSVPSection = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call - can be extended to save RSVP to database
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Save RSVP to Google Sheet
+      const { data, error } = await supabase.functions.invoke('save-rsvp', {
+        body: {
+          guestName: selectedGuest.name,
+          attending: attendance === "attending",
+          rowIndex: selectedGuest.rowIndex,
+        },
+      });
 
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+      if (error || data?.success === false) {
+        // Extract error message, prioritizing note (detailed error) if available
+        let description = "We couldn't save your RSVP. Please try again.";
+        if (data) {
+          if (data.note) {
+            // Show detailed error from Google Sheets API if available
+            description = data.note.length > 200 
+              ? `${data.note.substring(0, 200)}...` 
+              : data.note;
+          } else if (data.error) {
+            description = data.error;
+          }
+        } else if (error?.message) {
+          description = error.message;
+        }
 
-    toast({
-      title: attendance === "attending" ? "See you there! 🎉" : "We'll miss you!",
-      description: `Thank you for your response, ${selectedGuest}.`,
-    });
+        toast({
+          title: "Couldn't save RSVP",
+          description,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsSubmitted(true);
+      toast({
+        title: attendance === "attending" ? "See you there!" : "We'll miss you",
+        description: `Thank you for your response, ${selectedGuest.name}.`,
+      });
+    } catch (err) {
+      console.error('Failed to save RSVP:', err);
+      toast({
+        title: "Couldn't save RSVP",
+        description: "Please try again in a moment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (isSubmitted) {
@@ -90,7 +134,7 @@ const RSVPSection = () => {
             </div>
           </motion.div>
           <h2 className="text-3xl md:text-4xl font-display font-semibold text-foreground mb-4">
-            Thank You, {selectedGuest}!
+            Thank You, {selectedGuest?.name}!
           </h2>
           <p className="text-lg font-body text-muted-foreground">
             {attendance === "attending"
@@ -152,7 +196,7 @@ const RSVPSection = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-lg bg-card">
                     {guests.map((guest, index) => (
                       <button
-                        key={`${guest}-${index}`}
+                        key={`${guest.name}-${index}`}
                         type="button"
                         onClick={() => {
                           setSelectedGuest(guest);
@@ -160,12 +204,12 @@ const RSVPSection = () => {
                           setGuests([]);
                         }}
                         className={`p-3 text-left rounded-md font-body transition-colors ${
-                          selectedGuest === guest
+                          selectedGuest?.name === guest.name
                             ? "bg-gold/20 text-foreground border border-gold/30"
                             : "hover:bg-muted"
                         }`}
                       >
-                        {guest}
+                        {guest.name}
                       </button>
                     ))}
                   </div>
@@ -180,10 +224,10 @@ const RSVPSection = () => {
                 {selectedGuest && (
                   <div className="flex items-center gap-2 p-3 bg-gold/10 rounded-lg border border-gold/20">
                     <Heart className="w-4 h-4 text-gold" />
-                    <span className="font-body text-foreground">{selectedGuest}</span>
+                    <span className="font-body text-foreground">{selectedGuest.name}</span>
                     <button
                       type="button"
-                      onClick={() => setSelectedGuest("")}
+                      onClick={() => setSelectedGuest(null)}
                       className="ml-auto text-muted-foreground hover:text-foreground"
                     >
                       <X className="w-4 h-4" />

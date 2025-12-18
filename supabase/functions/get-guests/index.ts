@@ -34,16 +34,17 @@ serve(async (req) => {
     
     // Parse CSV - first column contains guest names
     const lines = csvText.split('\n');
-    const guests: string[] = [];
+    const guests: { name: string; rowIndex: number }[] = [];
     
-    for (let i = 0; i < lines.length; i++) {
+    // Skip header row (index 0)
+    for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line) {
         // Get the first column (name)
         const columns = line.split(',');
         const name = columns[0]?.replace(/"/g, '').trim();
         if (name && name.length > 0) {
-          guests.push(name);
+          guests.push({ name, rowIndex: i - 1 }); // rowIndex is 0-based (excluding header)
         }
       }
     }
@@ -55,7 +56,7 @@ serve(async (req) => {
     if (searchQuery && searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filteredGuests = guests.filter(guest => 
-        guest.toLowerCase().includes(query)
+        guest.name.toLowerCase().includes(query)
       );
       console.log(`Filtered to ${filteredGuests.length} guests matching "${searchQuery}"`);
     }
@@ -71,7 +72,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error("Error in get-guests function:", errorMessage);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: errorMessage, guests: [] }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 

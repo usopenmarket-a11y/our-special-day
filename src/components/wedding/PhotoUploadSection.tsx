@@ -3,12 +3,9 @@ import { motion } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, Image as ImageIcon, X, Check, Camera } from "lucide-react";
+import { Upload, X, Check, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { weddingConfig } from "@/lib/weddingConfig";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 interface UploadedFile {
   id: string;
@@ -83,39 +80,54 @@ const PhotoUploadSection = () => {
   };
 
   const uploadFiles = async () => {
-    if (files.length === 0) return;
-
-    const pendingFilesToUpload = files.filter((f) => f.status === "pending");
-    if (pendingFilesToUpload.length === 0) return;
+    const pending = files.filter((f) => f.status === "pending");
+    if (pending.length === 0) return;
 
     // Update all pending files to uploading status
     setFiles((prev) =>
       prev.map((f) => (f.status === "pending" ? { ...f, status: "uploading" as const } : f))
     );
 
-    let successCount = 0;
-    let errorCount = 0;
-
-    // Upload each file to Google Drive via Supabase Edge Function
-    for (const uploadFile of pendingFilesToUpload) {
+    // Upload each file
+    for (const uploadFile of pending) {
       try {
-        const formData = new FormData();
-        formData.append("file", uploadFile.file);
-        formData.append("folderId", weddingConfig.uploadFolderId);
+        // Read file as base64 and send JSON payload so supabase.functions.invoke works
+        const arrayBuffer = await uploadFile.file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
+        let binary = "";
+        for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+        const base64 = btoa(binary);
 
-        // Use fetch directly for FormData uploads
-        const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-photo`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: formData,
+        const payload = {
+          fileName: uploadFile.file.name,
+          mimeType: uploadFile.file.type,
+          base64,
+          folderId: weddingConfig.uploadFolderId,
+        };
+
+        const { data, error } = await supabase.functions.invoke("upload-photo", {
+          body: payload,
         });
 
-        const data = await response.json();
+        const backendError =
+          error?.message ||
+          (typeof data === "object" && data && "success" in data && (data as any).success === false
+            ? (data as any).error
+            : undefined);
 
-        if (!response.ok || !data.success) {
-          throw new Error(data.error || `Upload failed: ${response.status}`);
+        if (backendError) {
+          console.error("Upload error:", error ?? data);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+          toast({
+            title: "Upload failed",
+            description: backendError,
+            variant: "destructive",
+          });
+          continue;
         }
 
         setFiles((prev) =>
@@ -123,37 +135,25 @@ const PhotoUploadSection = () => {
             f.id === uploadFile.id ? { ...f, status: "success" as const } : f
           )
         );
-        successCount++;
-      } catch (error) {
-        console.error("Error uploading file:", error);
+      } catch (err) {
+        console.error("Upload failed:", err);
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uploadFile.id ? { ...f, status: "error" as const } : f
           )
         );
-        errorCount++;
+        toast({
+          title: "Upload failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
       }
     }
 
-    // Show toast based on results
-    if (successCount > 0 && errorCount === 0) {
-      toast({
-        title: "Photos uploaded! 📸",
-        description: `Successfully uploaded ${successCount} photo${successCount > 1 ? "s" : ""}. Thank you for sharing your memories with us.`,
-      });
-    } else if (successCount > 0 && errorCount > 0) {
-      toast({
-        title: "Partial upload complete",
-        description: `Uploaded ${successCount} photo${successCount > 1 ? "s" : ""}, but ${errorCount} failed. Please try again.`,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Upload failed",
-        description: "Failed to upload photos. Please try again.",
-        variant: "destructive",
-      });
-    }
+    toast({
+      title: "Upload finished",
+      description: "If any photo failed, you'll see an error message above.",
+    });
   };
 
   const pendingFiles = files.filter((f) => f.status === "pending");
@@ -260,6 +260,8 @@ const PhotoUploadSection = () => {
                             ? "bg-foreground/50"
                             : uploadFile.status === "success"
                             ? "bg-sage/50"
+                            : uploadFile.status === "error"
+                            ? "bg-destructive/50"
                             : "bg-transparent group-hover:bg-foreground/30"
                         }`}
                       >
@@ -270,9 +272,7 @@ const PhotoUploadSection = () => {
                           <Check className="w-8 h-8 text-card" />
                         )}
                         {uploadFile.status === "error" && (
-                          <div className="text-destructive text-xs text-center px-2">
-                            Failed
-                          </div>
+                          <X className="w-8 h-8 text-card" />
                         )}
                         {uploadFile.status === "pending" && (
                           <button

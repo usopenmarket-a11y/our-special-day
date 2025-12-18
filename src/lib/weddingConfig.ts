@@ -1,6 +1,6 @@
 // Wedding Configuration - Edit these values to customize your invitation
 export const weddingConfig = {
-  // Couple names (order adjusted to 'Fady & Sandra')
+  // Couple names (display order: Fady & Sandra)
   bride: "Fady",
   groom: "Sandra",
   
@@ -33,6 +33,15 @@ export const weddingConfig = {
   
   // Google Drive folder for guest uploads
   uploadFolderId: "1uTizlj_-8c6KqODuWcIr8N4VscIwYJJL",
+
+  // Google Drive folder for gallery images
+  galleryFolderId: "1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D",
+
+  // Bible verse
+  bibleVerse: {
+    text: "So they are no longer two, but one flesh. Therefore what God has joined together, let no one separate.",
+    reference: "Matthew 19:6 NIV",
+  },
   
   // Messages
   messages: {
