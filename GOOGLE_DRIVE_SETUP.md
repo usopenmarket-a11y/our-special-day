@@ -159,9 +159,35 @@ supabase secrets set GOOGLE_SERVICE_ACCOUNT=$base64
 If you haven't deployed the Edge Functions yet:
 
 1. Make sure you have Supabase CLI installed:
-   ```bash
-   npm install -g supabase
+   
+   **Windows (using Scoop - recommended):**
+   ```powershell
+   # Install Scoop if you don't have it
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+   Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+   
+   # Install Supabase CLI
+   scoop install supabase
    ```
+   
+   **Windows (using Chocolatey):**
+   ```powershell
+   choco install supabase
+   ```
+   
+   **macOS (using Homebrew):**
+   ```bash
+   brew install supabase/tap/supabase
+   ```
+   
+   **Linux:**
+   ```bash
+   # Using npm (not global)
+   npx supabase --help
+   # Or download binary from: https://github.com/supabase/cli/releases
+   ```
+   
+   **Note:** Installing Supabase CLI globally via `npm install -g supabase` is **not supported**. Use one of the methods above.
 
 2. Login to Supabase:
    ```bash
