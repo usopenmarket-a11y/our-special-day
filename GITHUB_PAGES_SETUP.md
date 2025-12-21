@@ -78,6 +78,28 @@ Your website needs Supabase credentials to work. Add them as GitHub Secrets:
 
 ---
 
+### ⚠️ Important: Refresh Token Not Needed for GitHub Pages
+
+**You don't need to add the OAuth refresh token to GitHub Secrets!**
+
+**Why?**
+- The **refresh token** is used by **Supabase Edge Functions** (backend), not the frontend
+- GitHub Pages only hosts the **frontend** (React app)
+- The refresh token is already stored in **Supabase secrets** (not GitHub)
+- Your frontend only needs the Supabase URL and anon key (which you just added above)
+
+**Where is the refresh token used?**
+- It's stored in Supabase Dashboard → Settings → Edge Functions → Secrets
+- It's used by the `upload-photo` Edge Function when uploading photos to Google Drive
+- It's already set up (if you followed `COMPLETE_SETUP_GUIDE.md`)
+
+**What you need for GitHub Pages:**
+- ✅ `VITE_SUPABASE_URL` (frontend connects to Supabase)
+- ✅ `VITE_SUPABASE_PUBLISHABLE_KEY` (frontend authenticates)
+- ❌ Refresh token (NOT needed - backend only)
+
+---
+
 ### Step 3: Create GitHub Actions Workflow
 
 Create the deployment workflow file:
@@ -241,6 +263,19 @@ After deployment, verify:
 - Check workflow logs for environment variable errors
 - Make sure secrets match your Supabase project
 
+### Issue: Photo upload fails on deployed site
+
+**Solution:**
+- This is a **backend** issue, not a GitHub Pages issue
+- The refresh token is stored in **Supabase secrets**, not GitHub
+- Check Supabase Dashboard → Edge Functions → upload-photo → Logs
+- Verify these Supabase secrets are set:
+  - `GOOGLE_SERVICE_ACCOUNT` (or `GOOGLE_SERVICE_ACCOUNT_JSON`)
+  - `GOOGLE_OAUTH_CLIENT_ID`
+  - `GOOGLE_OAUTH_CLIENT_SECRET`
+  - `GOOGLE_OAUTH_REFRESH_TOKEN`
+- See `COMPLETE_SETUP_GUIDE.md` for backend setup
+
 ### Issue: Workflow fails
 
 **Solution:**
@@ -285,4 +320,20 @@ Your wedding website is now live on GitHub Pages! Share the URL with your guests
 - Test all features on the live site
 - Share the URL with family and friends
 - Any code changes you push will automatically deploy
+
+---
+
+## 📚 Understanding Frontend vs Backend
+
+**Frontend (GitHub Pages):**
+- Hosts your React website
+- Needs: Supabase URL + anon key (for connecting to Supabase)
+- Stored in: GitHub Secrets → Actions
+
+**Backend (Supabase Edge Functions):**
+- Handles photo uploads, RSVP saving, gallery fetching
+- Needs: Service account JSON + OAuth refresh token (for Google Drive/Sheets)
+- Stored in: Supabase Dashboard → Settings → Edge Functions → Secrets
+
+**Key Point:** The refresh token is **already set up** in Supabase (if you followed the setup guide). You don't need to do anything with it for GitHub Pages deployment!
 
