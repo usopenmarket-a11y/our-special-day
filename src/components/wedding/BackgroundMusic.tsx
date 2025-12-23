@@ -57,9 +57,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       if (errorCode === 4) { // MEDIA_ELEMENT_ERROR: Format error
         const ext = currentSong.toLowerCase().split('.').pop();
         if (ext === 'm4a' || ext === 'mp4') {
-          detailedError += `\n\n❌ Format Error: M4A/MP4 files may not be supported by your browser or may need conversion.\n\n💡 Recommended Solution:\nConvert to MP3 format for universal browser support:\n1. Use VLC Media Player (Media → Convert / Save → Audio - MP3)\n2. Or use online converter (search "m4a to mp3")\n3. Replace the file in public/music/ folder\n4. Run: npm run generate-music\n\nSee CONVERT_TO_MP3.md for detailed instructions.`;
+          detailedError += `\n\n❌ M4A Format Error: Your browser cannot decode this M4A file's codec.\n\n💡 Possible solutions:\n1. Try a different browser (Chrome/Edge usually have better M4A support)\n2. The file may need to be re-encoded with a compatible codec\n3. Convert to MP3 for universal compatibility (see FIX_MUSIC_NOW.md)`;
         } else {
-          detailedError += `\n\n❌ Format Error: The file may not be a valid audio format or may be corrupted.\n\n💡 Solutions:\n1. Verify the file is a valid MP3, MP4, or M4A file\n2. Try converting to MP3 format for better compatibility\n3. Check the file isn't corrupted\n4. Try playing the file in a media player first`;
+          detailedError += `\n\n❌ Format Error: The file may not be a valid audio format or may be corrupted.\n\n💡 Solutions:\n1. Verify the file is a valid MP3, MP4, or M4A file\n2. Check the file isn't corrupted\n3. Try playing the file in a media player first`;
         }
       } else {
         detailedError += `\n\nError: ${errorMsg} (Code: ${errorCode})`;
@@ -120,23 +120,13 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // Check file extension
     const ext = filename.toLowerCase().split('.').pop();
     
-    // M4A files often have codec compatibility issues - warn user
-    if (ext === 'm4a' || ext === 'mp4') {
-      console.warn(`⚠️  M4A/MP4 file detected: ${filename}`);
-      console.warn(`   M4A files may not work in all browsers due to codec differences.`);
-      console.warn(`   Recommendation: Convert to MP3 format for universal compatibility.`);
-      console.warn(`   Quick converter: https://cloudconvert.com/m4a-to-mp3`);
-    }
-    
-    // Set the source
-    audio.src = encodedPath;
-    audio.crossOrigin = "anonymous";
-    
+    // Note: Source is set via <source> element in JSX with proper MIME type
+    // This provides better format detection for M4A files
+    // We trigger load() to make the audio element re-evaluate the source
     console.log(`🎵 Loading audio: ${encodedPath} (format: ${ext})`);
     
-    // Debug logging
-    console.log(`🎵 Attempting to load: ${encodedPath}`);
-    console.log(`📁 Original path: ${audioSrc}`);
+    // Load the audio - this will use the <source> element from JSX
+    audio.load();
     
     // Add canplaythrough listener to verify file is valid
     const handleCanPlay = () => {
@@ -152,12 +142,6 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     audio.addEventListener('loadstart', handleLoadStart);
     
     audio.load();
-    
-    // Cleanup
-    return () => {
-      audio.removeEventListener('canplaythrough', handleCanPlay);
-      audio.removeEventListener('loadstart', handleLoadStart);
-    };
 
     // Auto-play on mount (with user interaction fallback)
     const tryPlay = async () => {
@@ -200,7 +184,8 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
-      cleanup();
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('loadstart', handleLoadStart);
     };
   }, [currentSong, playlist.length, isPlaying, volume, isMuted, type]);
 
@@ -246,8 +231,34 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       <audio
         ref={audioRef}
         preload="auto"
-        crossOrigin="anonymous"
-      />
+      >
+        {/* Use source element for better format detection */}
+        {currentSong && (() => {
+          let audioSrc = currentSong;
+          if (!audioSrc.startsWith('/')) {
+            audioSrc = `/${audioSrc}`;
+          }
+          const pathParts = audioSrc.split('/');
+          const folder = pathParts.slice(0, -1).join('/');
+          const filename = pathParts[pathParts.length - 1];
+          const encodedPath = `${folder}/${encodeURIComponent(filename)}`;
+          const ext = filename.toLowerCase().split('.').pop();
+          
+          // Determine MIME type based on extension
+          let mimeType = 'audio/mpeg';
+          if (ext === 'm4a') {
+            mimeType = 'audio/mp4'; // M4A uses MP4 container
+          } else if (ext === 'mp4') {
+            mimeType = 'audio/mp4';
+          } else if (ext === 'mp3') {
+            mimeType = 'audio/mpeg';
+          }
+          
+          return (
+            <source src={encodedPath} type={mimeType} />
+          );
+        })()}
+      </audio>
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
