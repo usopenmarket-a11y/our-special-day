@@ -8,6 +8,7 @@
     "build": "npm run generate-music && vite build",
     "build:dev": "npm run generate-music && vite build --mode development",
     "generate-music": "node scripts/generate-music-list.js",
+    "fix-music-extensions": "node scripts/fix-music-extensions.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -42,17 +42,33 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
     // Set volume
     audio.volume = isMuted ? 0 : volume;
+    
+    // Reset any previous errors
+    setError(null);
 
     // Handle audio load errors
     const handleError = () => {
+      const errorCode = audio.error?.code;
       const errorMsg = audio.error?.message || "Unknown error";
-      setError(`Failed to load: ${currentSong.substring(0, 50)}... Error: ${errorMsg}`);
+      
+      let detailedError = `Failed to load: ${currentSong.substring(0, 50)}...`;
+      
+      // Provide more specific error messages
+      if (errorCode === 4) { // MEDIA_ELEMENT_ERROR: Format error
+        detailedError += `\n\n❌ Format Error: The file may not be a valid audio format, or the file extension doesn't match the actual format.\n\n💡 Solutions:\n1. Verify the file is a valid MP3, MP4, or M4A file\n2. If the file is MP4/M4A, rename it to .m4a or .mp4\n3. Try converting the file to MP3 format\n4. Check the file isn't corrupted`;
+      } else {
+        detailedError += `\n\nError: ${errorMsg} (Code: ${errorCode})`;
+      }
+      
+      setError(detailedError);
       console.error("Audio load error:", audio.error);
       console.error("Failed URL:", currentSong);
+      console.error("Error code:", errorCode);
       console.log("\n💡 Troubleshooting tips:");
       console.log("1. Make sure the file exists in public/music/ folder");
       console.log("2. Check the filename is correct (case-sensitive)");
-      console.log("3. Verify the file is a valid MP3 format");
+      console.log("3. Verify the file is a valid audio format (MP3, MP4, or M4A)");
+      console.log("4. If file extension doesn't match format, rename it (e.g., .mp4 file should have .mp4 extension)");
       
       // Try next song on error (only if playlist has multiple songs)
       if (playlist.length > 1) {
@@ -90,13 +106,53 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       audioSrc = `/${audioSrc}`;
     }
     
-    audio.src = audioSrc;
+    // URL encode only the filename part to handle spaces and special characters
+    const pathParts = audioSrc.split('/');
+    const folder = pathParts.slice(0, -1).join('/'); // /music
+    const filename = pathParts[pathParts.length - 1]; // filename.mp3
+    const encodedPath = `${folder}/${encodeURIComponent(filename)}`;
+    
+    // Detect file format from extension to set correct MIME type
+    const ext = filename.toLowerCase().split('.').pop();
+    let mimeType = 'audio/mpeg'; // Default to MP3
+    
+    if (ext === 'mp4' || ext === 'm4a') {
+      mimeType = 'audio/mp4';
+    } else if (ext === 'mp3') {
+      mimeType = 'audio/mpeg';
+    }
+    
+    // Set the source with explicit type hint
+    audio.src = encodedPath;
     audio.crossOrigin = "anonymous";
     
+    // Note: We can't set type attribute directly on audio element,
+    // but the browser should detect based on file content
+    
     // Debug logging
-    console.log(`Loading audio from: ${audioSrc}`);
+    console.log(`🎵 Attempting to load: ${encodedPath}`);
+    console.log(`📁 Original path: ${audioSrc}`);
+    
+    // Add canplaythrough listener to verify file is valid
+    const handleCanPlay = () => {
+      console.log(`✅ Audio file is valid and ready: ${encodedPath}`);
+      setError(null);
+    };
+    
+    const handleLoadStart = () => {
+      console.log(`🔄 Starting to load: ${encodedPath}`);
+    };
+    
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    audio.addEventListener('loadstart', handleLoadStart);
     
     audio.load();
+    
+    // Cleanup
+    return () => {
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('loadstart', handleLoadStart);
+    };
 
     // Auto-play on mount (with user interaction fallback)
     const tryPlay = async () => {
@@ -139,6 +195,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
+      cleanup();
     };
   }, [currentSong, playlist.length, isPlaying, volume, isMuted, type]);
 
