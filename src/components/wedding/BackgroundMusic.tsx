@@ -195,12 +195,18 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
     // Play on first user interaction if auto-play was blocked
     const handleFirstInteraction = async () => {
-      if (audio.paused) {
+      if (audio && audio.paused) {
         try {
+          // Unmute before playing (in case it was muted for autoplay)
+          if (audio.muted && startMuted) {
+            audio.muted = false;
+            setStartMuted(false);
+            setIsMuted(false);
+          }
           await audio.play();
           setIsPlaying(true);
           setError(null);
-          console.log("🎵 Audio started on user interaction");
+          console.log("🎵 ✅ Audio started on user interaction");
         } catch (error) {
           console.error("Failed to play audio:", error);
           setError("Could not play audio. Browser may require user interaction.");
@@ -208,13 +214,19 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       }
     };
 
-    // Add listeners for user interaction (only once per mount)
-    document.addEventListener("click", handleFirstInteraction, { once: true });
-    document.addEventListener("touchstart", handleFirstInteraction, { once: true });
+    // Add listeners for user interaction (multiple events for better coverage)
+    const interactionEvents = ['click', 'touchstart', 'mousedown', 'keydown'];
+    interactionEvents.forEach(eventType => {
+      document.addEventListener(eventType, handleFirstInteraction, { once: true, passive: true });
+    });
 
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
+      // Remove interaction listeners
+      interactionEvents.forEach(eventType => {
+        document.removeEventListener(eventType, handleFirstInteraction);
+      });
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
