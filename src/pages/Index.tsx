@@ -38,10 +38,14 @@ const Index = () => {
         <Footer />
         
         {/* Background Music */}
-        {weddingConfig.backgroundMusicUrl && (
+        {(weddingConfig.backgroundMusicUrl && 
+          (Array.isArray(weddingConfig.backgroundMusicUrl) 
+            ? weddingConfig.backgroundMusicUrl.length > 0 
+            : weddingConfig.backgroundMusicUrl)) && (
           <BackgroundMusic 
             src={weddingConfig.backgroundMusicUrl} 
             volume={0.3}
+            shuffle={weddingConfig.backgroundMusicShuffle}
             type={weddingConfig.backgroundMusicType}
           />
         )}

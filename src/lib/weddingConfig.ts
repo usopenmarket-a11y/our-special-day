@@ -37,14 +37,38 @@ export const weddingConfig = {
   // Google Drive folder for gallery images
   galleryFolderId: "1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D",
 
-  // Background music URL (add your music file URL here)
-  // For direct audio files: "https://example.com/music.mp3"
-  // For Anghami: Paste the song URL (e.g., "https://play.anghami.com/song/1104184394")
-  //   or the embed URL from Share > Embed option
-  backgroundMusicUrl: "https://play.anghami.com/song/1104184394", 
+  // Background music - RECOMMENDED: Use direct audio file URLs for best performance
+  // 
+  // OPTION 1: Single song (string)
+  //   backgroundMusicUrl: "https://example.com/music.mp3",
+  //
+  // OPTION 2: Playlist (array of URLs) - Recommended! 
+  //   Songs will play in sequence or shuffled randomly
+  //   backgroundMusicUrl: [
+  //     "https://example.com/song1.mp3",
+  //     "https://example.com/song2.mp3",
+  //     "https://example.com/song3.mp3",
+  //   ],
+  //
+  // BEST HOSTING OPTIONS (faster than Anghami):
+  // 1. Google Drive: Upload MP3, right-click > Share > Anyone with link > Copy link
+  //    Then convert: https://drive.google.com/uc?export=download&id=FILE_ID
+  // 2. Dropbox: Upload MP3, share link, change ?dl=0 to ?dl=1 at the end
+  // 3. Cloudflare R2 / AWS S3: Direct links (fastest)
+  // 4. GitHub Releases: Upload MP3 to a release, use raw.githubusercontent.com link
+  // 5. Your own server: Place MP3 files in public folder
+  //
+  // Example Google Drive link format:
+  //   If share link is: https://drive.google.com/file/d/1ABC123xyz/view?usp=sharing
+  //   Use: https://drive.google.com/uc?export=download&id=1ABC123xyz
+  //
+  backgroundMusicUrl: [] as string[] | string, // Add your music URL(s) here
   
-  // Background music type: "audio" for direct audio files, "anghami" for Anghami
-  backgroundMusicType: "anghami" as "audio" | "anghami",
+  // Shuffle playlist: true = random order, false = play in order
+  backgroundMusicShuffle: true,
+  
+  // Background music type: "audio" for direct audio files, "anghami" for Anghami (slow!)
+  backgroundMusicType: "audio" as "audio" | "anghami",
 
   // Bible verse
   bibleVerse: {

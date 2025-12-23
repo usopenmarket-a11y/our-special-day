@@ -1,42 +1,84 @@
 import { useState, useEffect, useRef } from "react";
-import { Volume2, VolumeX, AlertCircle } from "lucide-react";
+import { Volume2, VolumeX, AlertCircle, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface BackgroundMusicProps {
-  src: string;
+  src: string | string[]; // Support both single URL and playlist
   volume?: number;
-  type?: "audio" | "anghami"; // Support for Anghami embed
+  shuffle?: boolean; // Randomize playlist order
+  type?: "audio" | "anghami";
 }
 
-const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicProps) => {
+const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: BackgroundMusicProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [playlist, setPlaylist] = useState<string[]>([]);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Initialize playlist
+  useEffect(() => {
+    const songs = Array.isArray(src) ? src : [src];
+    let processedPlaylist = [...songs];
+    
+    // Shuffle if enabled
+    if (shuffle && processedPlaylist.length > 1) {
+      processedPlaylist = processedPlaylist.sort(() => Math.random() - 0.5);
+    }
+    
+    setPlaylist(processedPlaylist);
+    setCurrentSongIndex(0);
+  }, [src, shuffle]);
+
+  const currentSong = playlist[currentSongIndex];
 
   useEffect(() => {
-    if (type === "anghami") {
-      // For Anghami, we'll use iframe embed
-      // Anghami embeds handle their own playback
-      setIsPlaying(true);
-      return;
-    }
+    if (type === "anghami" || !currentSong) return;
 
     const audio = audioRef.current;
     if (!audio) return;
 
     // Set volume
-    audio.volume = volume;
+    audio.volume = isMuted ? 0 : volume;
 
     // Handle audio load errors
     const handleError = () => {
-      setError("Failed to load audio. Please check the URL.");
+      setError(`Failed to load: ${currentSong}`);
       console.error("Audio load error:", audio.error);
+      // Try next song on error
+      if (playlist.length > 1) {
+        setTimeout(() => playNext(), 1000);
+      }
     };
 
+    // Handle when song ends - play next
+    const handleEnded = () => {
+      if (playlist.length > 1) {
+        playNext();
+      } else {
+        // Loop single song
+        audio.currentTime = 0;
+        audio.play();
+      }
+    };
+
+    const handlePlay = () => {
+      setIsPlaying(true);
+      setError(null);
+    };
+    
+    const handlePause = () => setIsPlaying(false);
+
     audio.addEventListener("error", handleError);
+    audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+
+    // Load the current song
+    audio.src = currentSong;
+    audio.load();
 
     // Auto-play on mount (with user interaction fallback)
     const tryPlay = async () => {
@@ -50,7 +92,6 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
       }
     };
 
-    // Try to play after a short delay
     const timer = setTimeout(tryPlay, 500);
 
     // Play on first user interaction if auto-play was blocked
@@ -72,41 +113,23 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
     document.addEventListener("click", handleFirstInteraction);
     document.addEventListener("touchstart", handleFirstInteraction);
 
-    // Handle audio events
-    const handleEnded = () => {
-      // Loop the music
-      audio.currentTime = 0;
-      audio.play();
-    };
-
-    const handlePlay = () => {
-      setIsPlaying(true);
-      setError(null);
-    };
-    const handlePause = () => setIsPlaying(false);
-
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("play", handlePlay);
-    audio.addEventListener("pause", handlePause);
-
     return () => {
       clearTimeout(timer);
       document.removeEventListener("click", handleFirstInteraction);
       document.removeEventListener("touchstart", handleFirstInteraction);
+      audio.removeEventListener("error", handleError);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("error", handleError);
     };
-  }, [isPlaying, volume, type]);
+  }, [currentSong, playlist.length, isPlaying, volume, isMuted, type]);
+
+  const playNext = () => {
+    if (playlist.length <= 1) return;
+    setCurrentSongIndex((prev) => (prev + 1) % playlist.length);
+  };
 
   const toggleMute = () => {
-    if (type === "anghami") {
-      // Anghami iframe handles its own volume
-      setIsMuted(!isMuted);
-      return;
-    }
-
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -120,12 +143,6 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
   };
 
   const togglePlay = async () => {
-    if (type === "anghami") {
-      // Anghami iframe handles its own playback
-      setIsPlaying(!isPlaying);
-      return;
-    }
-
     const audio = audioRef.current;
     if (!audio) return;
 
@@ -142,118 +159,12 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
     }
   };
 
-  if (type === "anghami") {
-    // Extract iframe src from Anghami embed code or convert song URL to embed URL
-    let iframeSrc = src;
-    
-    // If it's an iframe HTML code, extract the src
-    if (src.includes("<iframe")) {
-      iframeSrc = src.match(/src="([^"]+)"/)?.[1] || src;
-    }
-    // If it's a song page URL, try to convert it to embed URL format
-    else if (src.includes("/song/")) {
-      const songId = src.match(/\/song\/(\d+)/)?.[1];
-      if (songId) {
-        // Try Anghami embed URL format
-        iframeSrc = `https://play.anghami.com/embed/song/${songId}`;
-      }
-    }
-    // If it already looks like an embed URL, use it directly
-    else if (src.includes("/embed/")) {
-      iframeSrc = src;
-    }
-
-    return (
-      <>
-        <iframe
-          ref={iframeRef}
-          src={iframeSrc}
-          style={{
-            position: "fixed",
-            bottom: "80px",
-            right: "20px",
-            width: "300px",
-            height: "80px",
-            border: "none",
-            borderRadius: "12px",
-            opacity: isPlaying ? 1 : 0.5,
-            pointerEvents: isPlaying ? "auto" : "none",
-            zIndex: 50,
-          }}
-          allow="autoplay"
-          title="Anghami Music Player"
-        />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 1 }}
-          className="fixed bottom-6 right-6 z-50"
-        >
-          <div className="flex flex-col gap-2 items-end">
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-destructive/90 text-card px-3 py-2 rounded-lg text-xs flex items-center gap-2 max-w-xs"
-              >
-                <AlertCircle className="w-4 h-4" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-            <div className="flex gap-2">
-              <Button
-                onClick={togglePlay}
-                variant="outline"
-                size="icon"
-                className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
-                aria-label={isPlaying ? "Pause music" : "Play music"}
-              >
-                <AnimatePresence mode="wait">
-                  {isPlaying ? (
-                    <motion.div
-                      key="playing"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      className="w-5 h-5 border-2 border-gold border-t-transparent rounded-full animate-spin"
-                    />
-                  ) : (
-                    <motion.div
-                      key="paused"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                      className="w-5 h-5 border-l-8 border-t-4 border-b-4 border-transparent border-l-gold ml-1"
-                    />
-                  )}
-                </AnimatePresence>
-              </Button>
-              <Button
-                onClick={toggleMute}
-                variant="outline"
-                size="icon"
-                className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
-                aria-label={isMuted ? "Unmute music" : "Mute music"}
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5 text-gold" />
-                ) : (
-                  <Volume2 className="w-5 h-5 text-gold" />
-                )}
-              </Button>
-            </div>
-          </div>
-        </motion.div>
-      </>
-    );
-  }
+  if (!currentSong) return null;
 
   return (
     <>
       <audio
         ref={audioRef}
-        src={src}
-        loop
         preload="auto"
         crossOrigin="anonymous"
       />
@@ -274,7 +185,26 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
               <span>{error}</span>
             </motion.div>
           )}
+          
+          {/* Song counter for playlists */}
+          {playlist.length > 1 && (
+            <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-2 py-1 rounded">
+              {currentSongIndex + 1} / {playlist.length}
+            </div>
+          )}
+          
           <div className="flex gap-2">
+            {playlist.length > 1 && (
+              <Button
+                onClick={playNext}
+                variant="outline"
+                size="icon"
+                className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
+                aria-label="Next song"
+              >
+                <SkipForward className="w-5 h-5 text-gold" />
+              </Button>
+            )}
             <Button
               onClick={togglePlay}
               variant="outline"
@@ -323,4 +253,3 @@ const BackgroundMusic = ({ src, volume = 0.3, type = "audio" }: BackgroundMusicP
 };
 
 export default BackgroundMusic;
-
