@@ -50,9 +50,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       console.error("Audio load error:", audio.error);
       console.error("Failed URL:", currentSong);
       console.log("\n💡 Troubleshooting tips:");
-      console.log("1. Make sure the file is set to 'Anyone with the link can view' in Google Drive");
-      console.log("2. Test the URL directly in your browser");
-      console.log("3. Try alternative link format (see GOOGLE_DRIVE_FIX.md)");
+      console.log("1. Make sure the file exists in public/music/ folder");
+      console.log("2. Check the filename is correct (case-sensitive)");
+      console.log("3. Verify the file is a valid MP3 format");
       
       // Try next song on error (only if playlist has multiple songs)
       if (playlist.length > 1) {
@@ -84,9 +84,18 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     audio.addEventListener("pause", handlePause);
 
     // Load the current song
-    // Handle Google Drive links that might return HTML instead of audio
-    audio.src = currentSong;
-    audio.crossOrigin = "anonymous"; // Help with CORS if needed
+    // Ensure path is correct (starts with / for public folder)
+    let audioSrc = currentSong;
+    if (!audioSrc.startsWith('/')) {
+      audioSrc = `/${audioSrc}`;
+    }
+    
+    audio.src = audioSrc;
+    audio.crossOrigin = "anonymous";
+    
+    // Debug logging
+    console.log(`Loading audio from: ${audioSrc}`);
+    
     audio.load();
 
     // Auto-play on mount (with user interaction fallback)

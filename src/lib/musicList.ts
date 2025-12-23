@@ -3,8 +3,8 @@
 // Run 'npm run generate-music' to regenerate this file
 
 export const musicFiles: string[] = [
-  "/music/La leçon particulière.mp3",
-  "/music/die with smile.mp3"
+  "/music/La%20le%C3%A7on%20particuli%C3%A8re.mp3",
+  "/music/die%20with%20smile.mp3"
 ];
 
 // Export for easy access

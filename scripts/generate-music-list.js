@@ -22,7 +22,11 @@ function getMusicFiles() {
     const files = fs.readdirSync(musicDir);
     const mp3Files = files
       .filter(file => file.toLowerCase().endsWith('.mp3'))
-      .map(file => `/music/${file}`)
+      .map(file => {
+        // URL encode the filename to handle spaces and special characters
+        const encodedFileName = encodeURIComponent(file);
+        return `/music/${encodedFileName}`;
+      })
       .sort(); // Sort alphabetically
 
     return mp3Files;
