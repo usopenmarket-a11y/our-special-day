@@ -114,18 +114,22 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // URL encode only the filename part to handle spaces and special characters
     const pathParts = audioSrc.split('/');
     const folder = pathParts.slice(0, -1).join('/'); // /music
-    const filename = pathParts[pathParts.length - 1]; // filename.m4a
+    const filename = pathParts[pathParts.length - 1]; // filename.m4a or .mp3
     const encodedPath = `${folder}/${encodeURIComponent(filename)}`;
     
     // Set the source
-    // Note: M4A files may have compatibility issues in some browsers
-    // Consider converting to MP3 for better universal support
     audio.src = encodedPath;
     audio.crossOrigin = "anonymous";
     
     // Debug: Log the extension to help diagnose format issues
     const ext = filename.toLowerCase().split('.').pop();
     console.log(`🎵 Loading audio: ${encodedPath} (format: ${ext})`);
+    
+    // Try to set MIME type explicitly for better browser compatibility
+    // Note: This doesn't directly set MIME type, but helps with debugging
+    if (ext === 'm4a' || ext === 'mp4') {
+      console.log(`⚠️  Note: M4A/MP4 format detected. If you see format errors, convert to MP3.`);
+    }
     
     // Debug logging
     console.log(`🎵 Attempting to load: ${encodedPath}`);
