@@ -119,43 +119,63 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     
     // Check file extension
     const ext = filename.toLowerCase().split('.').pop();
+    console.log(`🎵 Loading audio: ${currentSong} (format: ${ext})`);
     
-    // Note: Source is set via <source> element in JSX with proper MIME type
-    // This provides better format detection for M4A files
-    // We trigger load() to make the audio element re-evaluate the source
-    console.log(`🎵 Loading audio: ${encodedPath} (format: ${ext})`);
-    
-    // Load the audio - this will use the <source> element from JSX
-    audio.load();
-    
-    // Add canplaythrough listener to verify file is valid
+    // Add canplaythrough listener to verify file is valid and trigger auto-play
     const handleCanPlay = () => {
-      console.log(`✅ Audio file is valid and ready: ${encodedPath}`);
+      console.log(`✅ Audio file is valid and ready: ${currentSong}`);
       setError(null);
+      
+      // Auto-play when audio is ready
+      if (audio.paused && !isPlaying) {
+        audio.play().then(() => {
+          setIsPlaying(true);
+          console.log("🎵 Audio auto-played successfully");
+        }).catch((error) => {
+          // Auto-play was blocked by browser (common on first load)
+          console.log("⚠️ Auto-play blocked by browser, waiting for user interaction");
+        });
+      }
+    };
+    
+    const handleCanPlayThrough = () => {
+      // Audio is fully loaded and can play through
+      console.log(`✅ Audio fully loaded: ${currentSong}`);
+      
+      // Try to auto-play if not already playing
+      if (audio.paused && !isPlaying) {
+        audio.play().then(() => {
+          setIsPlaying(true);
+          console.log("🎵 Audio auto-played successfully");
+        }).catch((error) => {
+          // Auto-play blocked, will wait for user interaction
+          console.log("⚠️ Auto-play blocked, will start on user interaction");
+        });
+      }
     };
     
     const handleLoadStart = () => {
-      console.log(`🔄 Starting to load: ${encodedPath}`);
+      console.log(`🔄 Starting to load: ${currentSong}`);
     };
     
-    audio.addEventListener('canplaythrough', handleCanPlay);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('canplaythrough', handleCanPlayThrough);
     audio.addEventListener('loadstart', handleLoadStart);
     
     audio.load();
 
-    // Auto-play on mount (with user interaction fallback)
-    const tryPlay = async () => {
-      try {
-        await audio.play();
-        setIsPlaying(true);
-        setError(null);
-      } catch (error) {
-        // Auto-play was blocked, wait for user interaction
-        console.log("Auto-play blocked, waiting for user interaction");
+    // Also try auto-play after a short delay as fallback (in case events don't fire)
+    const timer = setTimeout(async () => {
+      if (audio.paused && !isPlaying && audio.readyState >= 2) {
+        try {
+          await audio.play();
+          setIsPlaying(true);
+          console.log("🎵 Audio auto-played via timer fallback");
+        } catch (error) {
+          console.log("⚠️ Auto-play blocked, waiting for user interaction");
+        }
       }
-    };
-
-    const timer = setTimeout(tryPlay, 500);
+    }, 1000);
 
     // Play on first user interaction if auto-play was blocked
     const handleFirstInteraction = async () => {
@@ -184,7 +204,8 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('canplaythrough', handleCanPlayThrough);
       audio.removeEventListener('loadstart', handleLoadStart);
     };
   }, [currentSong, playlist.length, isPlaying, volume, isMuted, type]);
@@ -231,6 +252,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       <audio
         ref={audioRef}
         preload="auto"
+        autoPlay
       >
         {/* Use source element for better format detection */}
         {currentSong && (() => {
