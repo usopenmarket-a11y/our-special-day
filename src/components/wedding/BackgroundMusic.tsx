@@ -45,11 +45,18 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
     // Handle audio load errors
     const handleError = () => {
-      setError(`Failed to load: ${currentSong}`);
+      const errorMsg = audio.error?.message || "Unknown error";
+      setError(`Failed to load: ${currentSong.substring(0, 50)}... Error: ${errorMsg}`);
       console.error("Audio load error:", audio.error);
-      // Try next song on error
+      console.error("Failed URL:", currentSong);
+      console.log("\n💡 Troubleshooting tips:");
+      console.log("1. Make sure the file is set to 'Anyone with the link can view' in Google Drive");
+      console.log("2. Test the URL directly in your browser");
+      console.log("3. Try alternative link format (see GOOGLE_DRIVE_FIX.md)");
+      
+      // Try next song on error (only if playlist has multiple songs)
       if (playlist.length > 1) {
-        setTimeout(() => playNext(), 1000);
+        setTimeout(() => playNext(), 2000);
       }
     };
 

@@ -55,11 +55,21 @@ export const weddingConfig = {
   //   Add all your MP3 files from the Drive folder here:
   //
   backgroundMusicUrl: [
-    // Your Google Drive MP3 files (converted to direct download links)
+    // Your Google Drive MP3 files
+    // IMPORTANT: Make sure files are set to "Anyone with the link can view" in Google Drive
+    // Try format 1 (standard):
     "https://drive.google.com/uc?export=download&id=1oLEntHRZOpVdKtG1-jY48BApgHNO7cHB",
     "https://drive.google.com/uc?export=download&id=1SwK1l8AoVfRS3iy6oQBQDvuZ4s9WyAt7",
-    // Add more files here as needed:
-    // "https://drive.google.com/uc?export=download&id=FILE_ID_3",
+    
+    // If format 1 doesn't work, try format 2 (alternative):
+    // "https://drive.google.com/uc?id=1oLEntHRZOpVdKtG1-jY48BApgHNO7cHB&export=download",
+    // "https://drive.google.com/uc?id=1SwK1l8AoVfRS3iy6oQBQDvuZ4s9WyAt7&export=download",
+    
+    // Or format 3 (with confirm parameter to bypass virus scan):
+    // "https://drive.google.com/uc?export=download&id=1oLEntHRZOpVdKtG1-jY48BApgHNO7cHB&confirm=t",
+    // "https://drive.google.com/uc?export=download&id=1SwK1l8AoVfRS3iy6oQBQDvuZ4s9WyAt7&confirm=t",
+    
+    // Add more files here as needed
   ] as string[] | string,
   
   // Shuffle playlist: true = random order, false = play in order
