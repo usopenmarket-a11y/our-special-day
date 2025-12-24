@@ -91,6 +91,21 @@ const GallerySection = () => {
     });
   }, [api]);
 
+  // Reinitialize carousel when RTL changes to ensure proper rendering
+  useEffect(() => {
+    if (api && images.length > 0) {
+      // Small delay to ensure DOM is updated with new direction
+      const timer = setTimeout(() => {
+        try {
+          api.reInit();
+        } catch (error) {
+          console.error('Error reinitializing carousel:', error);
+        }
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isRTL, api, images.length]);
+
 
 
   return (
@@ -175,9 +190,9 @@ const GallerySection = () => {
 
         {/* Gallery Carousel */}
         {!loading && images.length > 0 && (
-          <div className="relative" dir={isRTL ? 'rtl' : 'ltr'}>
+          <div className="relative w-full" dir={isRTL ? 'rtl' : 'ltr'}>
             <Carousel
-              key={`carousel-${isRTL ? 'rtl' : 'ltr'}`}
+              key={`carousel-${isRTL ? 'rtl' : 'ltr'}-${images.length}`}
               setApi={setApi}
               opts={{
                 align: "center",

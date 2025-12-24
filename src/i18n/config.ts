@@ -15,12 +15,25 @@ i18n
     fallbackLng: 'en', // Fallback to English if language not found
     supportedLngs: ['en', 'ar'], // Supported languages
     detection: {
-      // Order of language detection
-      order: ['localStorage', 'navigator', 'htmlTag'],
-      // Cache user language preference
+      // Order of language detection - check browser language first, then localStorage
+      order: ['navigator', 'localStorage', 'htmlTag'],
+      // Cache user language preference after they manually change it
       caches: ['localStorage'],
       // Look for 'lang' key in localStorage
       lookupLocalStorage: 'i18nextLng',
+      // Convert detected language code (e.g., 'ar-EG', 'ar-SA') to 'ar'
+      convertDetectedLanguage: (lng: string) => {
+        // Map Arabic variants to 'ar'
+        if (lng.startsWith('ar')) {
+          return 'ar';
+        }
+        // Map English variants to 'en'
+        if (lng.startsWith('en')) {
+          return 'en';
+        }
+        // Return detected language or fallback
+        return lng.split('-')[0];
+      },
     },
     interpolation: {
       escapeValue: false, // React already escapes values
