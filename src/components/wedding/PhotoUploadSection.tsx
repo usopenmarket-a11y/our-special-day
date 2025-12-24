@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Upload, X, Check, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { weddingConfig } from "@/lib/weddingConfig";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
 
 interface UploadedFile {
@@ -17,6 +17,7 @@ interface UploadedFile {
 
 const PhotoUploadSection = () => {
   const { t } = useTranslation();
+  const { config } = useAppConfig();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
@@ -100,11 +101,25 @@ const PhotoUploadSection = () => {
         for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
         const base64 = btoa(binary);
 
+        if (!config?.uploadFolderId) {
+          toast({
+            title: "Upload unavailable",
+            description: "Upload folder not configured. Please contact the administrator.",
+            variant: "destructive",
+          });
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+          continue;
+        }
+
         const payload = {
           fileName: uploadFile.file.name,
           mimeType: uploadFile.file.type,
           base64,
-          folderId: weddingConfig.uploadFolderId,
+          folderId: config.uploadFolderId,
         };
 
         const { data, error } = await supabase.functions.invoke("upload-photo", {

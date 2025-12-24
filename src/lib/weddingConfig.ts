@@ -28,14 +28,23 @@ export const weddingConfig = {
     { time: "9:00 PM", event: "Dancing & Celebration", location: "Pyramids Park Resort Hotel" },
   ],
   
-  // Google Sheet ID for guest list
-  guestSheetId: "13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs",
+  // ⚠️ SECURITY: Google Drive/Sheets IDs are now stored in Supabase secrets
+  // These values are only used as fallbacks for local development
+  // In production, IDs are fetched from Supabase Edge Function 'get-config'
+  // 
+  // To set up secrets in Supabase:
+  // 1. Go to Supabase Dashboard → Project Settings → Edge Functions → Secrets
+  // 2. Add these secrets:
+  //    - GUEST_SHEET_ID: Your Google Sheet ID
+  //    - UPLOAD_FOLDER_ID: Your Google Drive upload folder ID
+  //    - GALLERY_FOLDER_ID: Your Google Drive gallery folder ID
+  //
+  // See SECURE_CONFIG_SETUP.md for detailed instructions
   
-  // Google Drive folder for guest uploads
-  uploadFolderId: "1uTizlj_-8c6KqODuWcIr8N4VscIwYJJL",
-
-  // Google Drive folder for gallery images
-  galleryFolderId: "1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D",
+  // Fallback values for local development (NOT used in production)
+  guestSheetId: "", // Empty by default - fetched from API in production
+  uploadFolderId: "", // Empty by default - fetched from API in production
+  galleryFolderId: "", // Empty by default - fetched from API in production
 
   // Background music - AUTO-DETECTED from public/music/ folder
   // 

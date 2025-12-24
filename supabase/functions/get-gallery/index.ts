@@ -57,8 +57,10 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { folderId } = await req.json();
-    if (!folderId) throw new Error('folderId is required');
+    const { folderId: providedFolderId } = await req.json();
+    // Use provided folderId or fall back to environment variable
+    const folderId = providedFolderId || Deno.env.get('GALLERY_FOLDER_ID');
+    if (!folderId) throw new Error('folderId is required (provide in request body or set GALLERY_FOLDER_ID secret)');
 
     console.log(`Fetching images from Google Drive folder: ${folderId}`);
 

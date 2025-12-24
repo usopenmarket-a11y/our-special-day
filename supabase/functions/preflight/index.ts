@@ -76,19 +76,20 @@ async function getAccessToken(scopes: string) {
   return data.access_token as string;
 }
 
-// Default IDs (match weddingConfig values)
-const SHEET_ID = '13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs';
-const GALLERY_FOLDER_ID = '1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D';
-const UPLOAD_FOLDER_ID = '1uTizlj_-8c6KqODuWcIr8N4VscIwYJJL';
+// Get IDs from environment variables (stored in Supabase secrets)
+// Fallback to hardcoded values for backward compatibility
+const getDefaultSheetId = () => Deno.env.get('GUEST_SHEET_ID') || '13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs';
+const getDefaultGalleryFolderId = () => Deno.env.get('GALLERY_FOLDER_ID') || '1l4IlQOJ5z7tA-Nn3_T3zsJHVAzPRrE2D';
+const getDefaultUploadFolderId = () => Deno.env.get('UPLOAD_FOLDER_ID') || '1uTizlj_-8c6KqODuWcIr8N4VscIwYJJL';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const { sheetId, galleryFolderId, uploadFolderId } = (await req.json().catch(() => ({}))) as any;
-    const sId = sheetId || SHEET_ID;
-    const gId = galleryFolderId || GALLERY_FOLDER_ID;
-    const uId = uploadFolderId || UPLOAD_FOLDER_ID;
+    const sId = sheetId || getDefaultSheetId();
+    const gId = galleryFolderId || getDefaultGalleryFolderId();
+    const uId = uploadFolderId || getDefaultUploadFolderId();
 
     // Obtain token with both Sheets and Drive scopes
     const scopes = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.metadata.readonly';

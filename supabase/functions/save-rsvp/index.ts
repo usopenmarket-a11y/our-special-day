@@ -122,7 +122,8 @@ serve(async (req) => {
 
   try {
     const { guestName, attending, rowIndex } = await req.json();
-    const sheetId = '13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs';
+    // Get sheet ID from environment variable (stored in Supabase secrets)
+    const sheetId = Deno.env.get('GUEST_SHEET_ID') || '13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs';
 
     if (!guestName) throw new Error('guestName is required');
 

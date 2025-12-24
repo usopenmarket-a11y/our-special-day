@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { weddingConfig } from "@/lib/weddingConfig";
+import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
 import {
   Carousel,
@@ -24,6 +24,7 @@ interface GalleryImage {
 
 const GallerySection = () => {
   const { t } = useTranslation();
+  const { config, loading: configLoading } = useAppConfig();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,11 +41,20 @@ const GallerySection = () => {
   );
 
   useEffect(() => {
+    // Wait for config to load before fetching gallery
+    if (configLoading || !config?.galleryFolderId) {
+      if (!configLoading && !config?.galleryFolderId) {
+        setError(t("gallery.error"));
+        setLoading(false);
+      }
+      return;
+    }
+
     const fetchGallery = async () => {
       try {
         setLoading(true);
         const { data, error } = await supabase.functions.invoke('get-gallery', {
-          body: { folderId: weddingConfig.galleryFolderId }
+          body: { folderId: config.galleryFolderId }
         });
 
         if (error) {
@@ -65,7 +75,7 @@ const GallerySection = () => {
     };
 
     fetchGallery();
-  }, []);
+  }, [config, configLoading, t]);
 
   useEffect(() => {
     if (!api) {
