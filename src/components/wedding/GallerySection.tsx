@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
@@ -26,7 +26,6 @@ const GallerySection = () => {
   const { t } = useTranslation();
   const { config, loading: configLoading } = useAppConfig();
   const [images, setImages] = useState<GalleryImage[]>([]);
-  const [selectedImage, setSelectedImage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [api, setApi] = useState<CarouselApi>();
@@ -89,17 +88,6 @@ const GallerySection = () => {
     });
   }, [api]);
 
-  const handlePrevious = () => {
-    if (selectedImage !== null) {
-      setSelectedImage(selectedImage === 0 ? images.length - 1 : selectedImage - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (selectedImage !== null) {
-      setSelectedImage(selectedImage === images.length - 1 ? 0 : selectedImage + 1);
-    }
-  };
 
   return (
     <section id="gallery" className="py-24 px-4 relative overflow-hidden">
@@ -201,22 +189,15 @@ const GallerySection = () => {
                       whileInView={{ opacity: 1, scale: 1 }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className="relative group cursor-pointer"
-                      onClick={() => setSelectedImage(index)}
+                      className="relative group"
                     >
                       <div className="relative overflow-hidden rounded-xl shadow-soft border border-gold/10 aspect-square md:aspect-[4/5]">
                         <img
                           src={image.url}
                           alt=""
-                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          className="w-full h-full object-cover"
                           loading="lazy"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-foreground/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="w-14 h-14 rounded-full bg-card/95 backdrop-blur-sm flex items-center justify-center shadow-glow border border-gold/20">
-                            <span className="text-gold text-2xl">+</span>
-                          </div>
-                        </div>
                       </div>
                     </motion.div>
                   </CarouselItem>
@@ -253,78 +234,6 @@ const GallerySection = () => {
           </div>
         )}
 
-        {/* Lightbox */}
-        <AnimatePresence>
-          {selectedImage !== null && images[selectedImage] && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-foreground/98 backdrop-blur-md flex items-center justify-center p-4"
-              onClick={() => setSelectedImage(null)}
-            >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedImage(null);
-                }}
-                className="absolute top-6 right-6 w-12 h-12 rounded-full bg-card/30 backdrop-blur-sm flex items-center justify-center text-card hover:bg-card/50 transition-all duration-300 shadow-lg z-10"
-                aria-label="Close"
-              >
-                <X className="w-6 h-6" />
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePrevious();
-                }}
-                className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-card/30 backdrop-blur-sm flex items-center justify-center text-card hover:bg-card/50 transition-all duration-300 shadow-lg z-10"
-                aria-label="Previous image"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleNext();
-                }}
-                className="absolute right-6 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-card/30 backdrop-blur-sm flex items-center justify-center text-card hover:bg-card/50 transition-all duration-300 shadow-lg z-10"
-                aria-label="Next image"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-
-              <motion.img
-                key={selectedImage}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
-                src={images[selectedImage].fullUrl}
-                alt=""
-                className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-                onError={(e) => {
-                  // Fallback: if fullUrl fails, try using the thumbnail URL in larger size
-                  const target = e.target as HTMLImageElement;
-                  const imageId = images[selectedImage]?.id;
-                  if (imageId && target.src !== `https://drive.google.com/uc?export=download&id=${imageId}`) {
-                    target.src = `https://drive.google.com/uc?export=download&id=${imageId}`;
-                  }
-                }}
-              />
-
-              {/* Image counter in lightbox */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-card/30 backdrop-blur-sm px-4 py-2 rounded-full">
-                <p className="text-sm font-body text-card">
-                  {selectedImage + 1} / {images.length}
-                </p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </section>
   );
