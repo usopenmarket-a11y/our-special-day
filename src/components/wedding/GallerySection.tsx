@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
+import { cn } from "@/lib/utils";
 import {
   Carousel,
   CarouselContent,
@@ -23,13 +24,15 @@ interface GalleryImage {
 }
 
 const GallerySection = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { config, loading: configLoading } = useAppConfig();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
+  const isRTL = i18n.language === 'ar';
+  
   const autoplay = useRef(
     Autoplay({ 
       delay: 4000, 
@@ -87,6 +90,7 @@ const GallerySection = () => {
       setCurrent(api.selectedScrollSnap());
     });
   }, [api]);
+
 
 
   return (
@@ -171,8 +175,9 @@ const GallerySection = () => {
 
         {/* Gallery Carousel */}
         {!loading && images.length > 0 && (
-          <div className="relative">
+          <div className="relative" dir={isRTL ? 'rtl' : 'ltr'}>
             <Carousel
+              key={`carousel-${isRTL ? 'rtl' : 'ltr'}`}
               setApi={setApi}
               opts={{
                 align: "center",
@@ -181,9 +186,9 @@ const GallerySection = () => {
               plugins={[autoplay.current]}
               className="w-full"
             >
-              <CarouselContent className="-ml-2 md:-ml-4">
+              <CarouselContent className={isRTL ? "-mr-2 md:-mr-4" : "-ml-2 md:-ml-4"}>
                 {images.map((image, index) => (
-                  <CarouselItem key={image.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
+                  <CarouselItem key={image.id} className={isRTL ? "pr-2 md:pr-4 md:basis-1/2 lg:basis-1/3" : "pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3"}>
                     <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}
                       whileInView={{ opacity: 1, scale: 1 }}
@@ -203,8 +208,14 @@ const GallerySection = () => {
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="hidden md:flex -left-12 lg:-left-16 h-12 w-12 border-gold/20 bg-card/80 backdrop-blur-sm hover:bg-card hover:border-gold/40 text-gold" />
-              <CarouselNext className="hidden md:flex -right-12 lg:-right-16 h-12 w-12 border-gold/20 bg-card/80 backdrop-blur-sm hover:bg-card hover:border-gold/40 text-gold" />
+              <CarouselPrevious className={cn(
+                "hidden md:flex h-12 w-12 border-gold/20 bg-card/80 backdrop-blur-sm hover:bg-card hover:border-gold/40 text-gold",
+                isRTL ? "-right-12 lg:-right-16" : "-left-12 lg:-left-16"
+              )} />
+              <CarouselNext className={cn(
+                "hidden md:flex h-12 w-12 border-gold/20 bg-card/80 backdrop-blur-sm hover:bg-card hover:border-gold/40 text-gold",
+                isRTL ? "-left-12 lg:-left-16" : "-right-12 lg:-right-16"
+              )} />
             </Carousel>
 
             {/* Carousel Indicators */}
