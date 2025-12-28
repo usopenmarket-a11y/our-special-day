@@ -99,9 +99,9 @@ const DetailsSection = () => {
                 href={weddingConfig.church.mapUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-3 sm:mt-4 text-sm sm:text-base text-gold hover:text-gold/90 font-body font-medium transition-colors group-hover:underline touch-manipulation"
+                className="inline-flex items-center gap-2 mt-3 sm:mt-4 px-4 py-3 min-h-[44px] text-sm sm:text-base text-gold hover:text-gold/90 font-body font-medium transition-colors group-hover:underline touch-manipulation rounded-md hover:bg-gold/5 active:bg-gold/10"
               >
-                <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("details.viewMap")}
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" /> {t("details.viewMap")}
               </a>
             </Card>
           </motion.div>
@@ -132,9 +132,9 @@ const DetailsSection = () => {
                 href={weddingConfig.venue.mapUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 mt-3 sm:mt-4 text-sm sm:text-base text-gold hover:text-gold/90 font-body font-medium transition-colors group-hover:underline touch-manipulation"
+                className="inline-flex items-center gap-2 mt-3 sm:mt-4 px-4 py-3 min-h-[44px] text-sm sm:text-base text-gold hover:text-gold/90 font-body font-medium transition-colors group-hover:underline touch-manipulation rounded-md hover:bg-gold/5 active:bg-gold/10"
               >
-                <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> {t("details.viewMap")}
+                <MapPin className="w-4 h-4 sm:w-5 sm:h-5" /> {t("details.viewMap")}
               </a>
             </Card>
           </motion.div>

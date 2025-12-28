@@ -268,13 +268,19 @@ const GallerySection = () => {
                 <button
                   key={index}
                   onClick={() => api?.scrollTo(index)}
-                  className={`h-2 sm:h-1.5 rounded-full transition-all duration-300 touch-manipulation ${
+                  className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full transition-all duration-300 touch-manipulation ${
                     Math.abs(current - index) <= 1
                       ? "w-8 sm:w-8 bg-gold"
                       : "w-2 sm:w-1.5 bg-gold/30 hover:bg-gold/50 active:bg-gold/70"
                   }`}
                   aria-label={`Go to slide ${index + 1}`}
-                />
+                >
+                  <span className={`rounded-full transition-all duration-300 ${
+                    Math.abs(current - index) <= 1
+                      ? "w-8 h-2 sm:h-1.5 bg-gold"
+                      : "w-2 h-2 sm:h-1.5 bg-gold/30"
+                  }`} />
+                </button>
               ))}
             </div>
 

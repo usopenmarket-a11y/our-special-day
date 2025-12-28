@@ -431,17 +431,19 @@ const RSVPSection = () => {
                                 return (
                                   <label
                                     key={`${guest.name}-${index}`}
-                                    className={`flex items-center gap-3 p-3 md:p-2 rounded-md cursor-pointer transition-colors touch-manipulation active:scale-[0.98] ${
+                                    className={`flex items-center gap-3 p-3 md:p-2 rounded-md cursor-pointer transition-colors touch-manipulation active:scale-[0.98] min-h-[44px] ${
                                       isSelected
                                         ? "bg-gold/10 border border-gold/30"
                                         : "hover:bg-muted/50 active:bg-muted/70"
                                     }`}
                                   >
-                                    <Checkbox
-                                      checked={isSelected}
-                                      onCheckedChange={() => toggleGuestSelection(guest)}
-                                      className="w-5 h-5 md:w-4 md:h-4"
-                                    />
+                                    <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() => toggleGuestSelection(guest)}
+                                        className="w-6 h-6 md:w-5 md:h-5"
+                                      />
+                                    </div>
                                     <span className="font-body text-sm md:text-base text-foreground flex-1">{guest.name}</span>
                                   </label>
                                 );
@@ -457,16 +459,19 @@ const RSVPSection = () => {
                         result.push(
                           <label
                             key={`${guest.name}-${index}`}
-                            className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                            className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors min-h-[44px] ${
                               isSelected
                                 ? "bg-gold/10 border border-gold/30"
                                 : "hover:bg-muted/50"
                             }`}
                           >
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={() => toggleGuestSelection(guest)}
-                            />
+                            <div className="min-w-[44px] min-h-[44px] flex items-center justify-center">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleGuestSelection(guest)}
+                                className="w-6 h-6"
+                              />
+                            </div>
                             <span className="font-body text-foreground flex-1">{guest.name}</span>
                           </label>
                         );
