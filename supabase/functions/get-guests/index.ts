@@ -38,21 +38,27 @@ serve(async (req) => {
     // Column C (index 2): Confirmation (not read here)
     // Column D (index 3): Date (not read here)
     // Column E (index 4): Time (not read here)
-    const lines = csvText.split('\n');
+    
+    // Handle different line endings and normalize
+    const normalizedCsv = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = normalizedCsv.split('\n').filter(line => line.trim().length > 0);
     const guests: { name: string; rowIndex: number; familyGroup?: string }[] = [];
+    
+    console.log(`Total lines in CSV (after normalization): ${lines.length}`);
     
     // Skip header row (index 0)
     for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (line) {
+      const line = lines[i];
+      if (line && line.trim()) {
         // Parse CSV columns (handle quoted values with commas)
         const columns = parseCSVLine(line);
-        const name = columns[0]?.replace(/"/g, '').trim(); // Column A: Name
-        const familyGroup = columns[1]?.replace(/"/g, '').trim() || ''; // Column B: Family Group
+        // Clean and trim each column, removing quotes and whitespace
+        const name = columns[0]?.replace(/^"+|"+$/g, '').trim(); // Column A: Name
+        const familyGroup = (columns[1]?.replace(/^"+|"+$/g, '').trim() || '').replace(/\s+$/, ''); // Column B: Family Group (remove trailing spaces)
         
-        // Debug: Log first few rows to verify parsing
-        if (i <= 15) {
-          console.log(`Row ${i}: Name="${name}", FamilyGroup="${familyGroup}", Columns=${columns.length}`);
+        // Debug: Log rows containing "Leo" or "Monica" to verify parsing
+        if (name && (name.toLowerCase().includes('leo') || name.toLowerCase().includes('monica'))) {
+          console.log(`Row ${i}: Name="${name}", FamilyGroup="${familyGroup}", RawCol1="${columns[1]}"`);
         }
         
         if (name && name.length > 0) {
