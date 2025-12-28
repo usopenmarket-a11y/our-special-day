@@ -91,6 +91,9 @@ const PhotoUploadSection = () => {
       prev.map((f) => (f.status === "pending" ? { ...f, status: "uploading" as const } : f))
     );
 
+    let successCount = 0;
+    let errorCount = 0;
+
     // Upload each file
     for (const uploadFile of pending) {
       try {
@@ -126,14 +129,9 @@ const PhotoUploadSection = () => {
           body: payload,
         });
 
-        const backendError =
-          error?.message ||
-          (typeof data === "object" && data && "success" in data && (data as any).success === false
-            ? (data as any).error
-            : undefined);
-
-        if (backendError) {
-          console.error("Upload error:", error ?? data);
+        // Check for errors first
+        if (error) {
+          console.error("Upload error:", error);
           setFiles((prev) =>
             prev.map((f) =>
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
@@ -141,17 +139,46 @@ const PhotoUploadSection = () => {
           );
           toast({
             title: t("upload.uploadFailed"),
-            description: backendError,
+            description: error.message || t("upload.errorMessage"),
             variant: "destructive",
           });
           continue;
         }
 
+        // Check response data - must have success: true AND an id
+        const responseData = data as any;
+        const isSuccess = 
+          responseData && 
+          typeof responseData === "object" && 
+          responseData.success === true && 
+          responseData.id;
+
+        if (!isSuccess) {
+          const errorMsg = responseData?.error || 
+                          (responseData?.success === false ? responseData.error : undefined) ||
+                          "Upload failed - no file ID returned";
+          console.error("Upload failed - invalid response:", responseData);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+          toast({
+            title: t("upload.uploadFailed"),
+            description: errorMsg,
+            variant: "destructive",
+          });
+          continue;
+        }
+
+        // Only mark as success if we have a valid file ID
+        console.log("Upload successful:", responseData.id, responseData.name);
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uploadFile.id ? { ...f, status: "success" as const } : f
           )
         );
+        successCount++;
       } catch (err) {
         console.error("Upload failed:", err);
         setFiles((prev) =>
@@ -159,6 +186,7 @@ const PhotoUploadSection = () => {
             f.id === uploadFile.id ? { ...f, status: "error" as const } : f
           )
         );
+        errorCount++;
         toast({
           title: t("upload.error"),
           description: err instanceof Error ? err.message : t("upload.errorMessage"),
@@ -167,10 +195,22 @@ const PhotoUploadSection = () => {
       }
     }
 
-    toast({
-      title: t("upload.success"),
-      description: t("upload.successMessage"),
-    });
+    // Only show success toast if at least one file was successfully uploaded
+    if (successCount > 0) {
+      toast({
+        title: t("upload.success"),
+        description: successCount === 1 
+          ? t("upload.photosUploaded", { count: 1 })
+          : t("upload.photosUploadedPlural", { count: successCount }),
+      });
+    } else if (errorCount > 0) {
+      // All uploads failed
+      toast({
+        title: t("upload.uploadFailed"),
+        description: t("upload.errorMessage"),
+        variant: "destructive",
+      });
+    }
   };
 
   const pendingFiles = files.filter((f) => f.status === "pending");
