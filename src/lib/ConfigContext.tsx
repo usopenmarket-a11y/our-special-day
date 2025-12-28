@@ -35,7 +35,17 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
 
         if (fetchError) {
           console.error('Error fetching config:', fetchError);
-          setError('Failed to load configuration. Some features may not work.');
+          const errorMsg = fetchError.message || String(fetchError);
+          
+          // Provide more specific error messages
+          let userMessage = 'Failed to load configuration. Some features may not work.';
+          if (errorMsg.includes('404') || errorMsg.includes('not found')) {
+            userMessage = 'Configuration function not found. Please deploy the get-config Edge Function in Supabase.';
+          } else if (errorMsg.includes('401') || errorMsg.includes('unauthorized')) {
+            userMessage = 'Configuration access denied. Please check your Supabase credentials.';
+          }
+          
+          setError(userMessage);
           // Set empty config so app can still render (components should handle missing IDs gracefully)
           setConfig({
             guestSheetId: '',

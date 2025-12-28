@@ -51,7 +51,7 @@ const PhotoUploadSection = () => {
     }));
 
     setFiles((prev) => [...prev, ...newFiles]);
-  }, [toast]);
+  }, [toast, t]);
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -103,8 +103,8 @@ const PhotoUploadSection = () => {
 
         if (!config?.uploadFolderId) {
           toast({
-            title: "Upload unavailable",
-            description: "Upload folder not configured. Please contact the administrator.",
+            title: t("upload.uploadUnavailable"),
+            description: t("upload.uploadFolderNotConfigured"),
             variant: "destructive",
           });
           setFiles((prev) =>
@@ -140,7 +140,7 @@ const PhotoUploadSection = () => {
             )
           );
           toast({
-            title: "Upload failed",
+            title: t("upload.uploadFailed"),
             description: backendError,
             variant: "destructive",
           });

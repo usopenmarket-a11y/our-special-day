@@ -28,10 +28,23 @@ const GallerySection = () => {
   const { config, loading: configLoading } = useAppConfig();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<'config' | 'api' | 'fetch' | null>(null);
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   const isRTL = i18n.language === 'ar';
+
+  // Get translated error message based on error type - recompute when language changes
+  const error = errorType === 'config' 
+    ? t("gallery.error")
+    : errorType === 'api' || errorType === 'fetch'
+    ? t("gallery.errorMessage")
+    : null;
+
+  // Force re-render when language changes to update error message
+  useEffect(() => {
+    // This effect ensures error message updates when language changes
+    // The error constant above will be recomputed automatically
+  }, [i18n.language, errorType, t]);
   
   const autoplay = useRef(
     Autoplay({ 
@@ -46,8 +59,10 @@ const GallerySection = () => {
     // Wait for config to load before fetching gallery
     if (configLoading || !config?.galleryFolderId) {
       if (!configLoading && !config?.galleryFolderId) {
-        setError(t("gallery.error"));
+        // Check if config error exists (function not deployed or secrets not set)
+        setErrorType('config');
         setLoading(false);
+        console.warn('Gallery not configured: GALLERY_FOLDER_ID is missing. Please set it in Supabase secrets.');
       }
       return;
     }
@@ -55,29 +70,41 @@ const GallerySection = () => {
     const fetchGallery = async () => {
       try {
         setLoading(true);
+        setErrorType(null);
         const { data, error } = await supabase.functions.invoke('get-gallery', {
           body: { folderId: config.galleryFolderId }
         });
 
         if (error) {
           console.error('Error fetching gallery:', error);
-          setError(t("gallery.error"));
+          setErrorType('fetch');
+          return;
+        }
+
+        if (data?.error) {
+          console.error('Gallery API error:', data.error);
+          setErrorType('api');
           return;
         }
 
         if (data?.images) {
           setImages(data.images);
+          setErrorType(null); // Clear any previous errors
+        } else {
+          // If no images and no error, it might be empty
+          setImages([]);
+          setErrorType(null);
         }
       } catch (err) {
         console.error('Failed to fetch gallery:', err);
-        setError(t("gallery.error"));
+        setErrorType('fetch');
       } finally {
         setLoading(false);
       }
     };
 
     fetchGallery();
-  }, [config, configLoading, t]);
+  }, [config, configLoading, i18n.language]);
 
   useEffect(() => {
     if (!api) {
@@ -172,8 +199,9 @@ const GallerySection = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
+            data-testid="gallery-error"
           >
-            <p className="text-muted-foreground font-body">{error}</p>
+            <p className="text-muted-foreground font-body" data-gallery-error="true">{error}</p>
           </motion.div>
         )}
 
@@ -183,8 +211,9 @@ const GallerySection = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center py-20"
+            data-testid="gallery-empty"
           >
-            <p className="text-muted-foreground font-body">{t("gallery.noPhotos")}</p>
+            <p className="text-muted-foreground font-body" data-gallery-empty="true">{t("gallery.noPhotos")}</p>
           </motion.div>
         )}
 

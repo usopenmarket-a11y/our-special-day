@@ -2,6 +2,8 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+// Import i18n synchronously to ensure it's initialized before components render
+import "./i18n/config";
 
 // Add error handler for unhandled errors
 window.addEventListener('error', (event) => {
@@ -14,12 +16,6 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason);
-});
-
-// Initialize i18n - import it but don't block rendering if it fails
-import("./i18n/config").catch((err) => {
-  console.error('Failed to initialize i18n:', err);
-  // App should still work without i18n - components will use fallback text
 });
 
 const rootElement = document.getElementById("root");

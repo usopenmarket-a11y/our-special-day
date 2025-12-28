@@ -95,7 +95,10 @@
     "fileTooLargeMessage": "{{fileName}} يتجاوز حد 10 ميجابايت.",
     "remove": "إزالة",
     "uploaded": "تم الرفع",
-    "noFileChosen": "لم يتم اختيار ملف"
+    "noFileChosen": "لم يتم اختيار ملف",
+    "uploadUnavailable": "الرفع غير متاح",
+    "uploadFolderNotConfigured": "مجلد الرفع غير مُكوّن. يرجى الاتصال بالمسؤول.",
+    "uploadFailed": "فشل الرفع"
   },
   "footer": {
     "closing": "لا يمكننا الانتظار للاحتفال معك!",

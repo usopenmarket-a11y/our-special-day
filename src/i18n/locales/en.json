@@ -95,7 +95,10 @@
     "fileTooLargeMessage": "{{fileName}} exceeds 10MB limit.",
     "remove": "Remove",
     "uploaded": "Uploaded",
-    "noFileChosen": "No file chosen"
+    "noFileChosen": "No file chosen",
+    "uploadUnavailable": "Upload unavailable",
+    "uploadFolderNotConfigured": "Upload folder not configured. Please contact the administrator.",
+    "uploadFailed": "Upload failed"
   },
   "footer": {
     "closing": "We can't wait to celebrate with you!",
