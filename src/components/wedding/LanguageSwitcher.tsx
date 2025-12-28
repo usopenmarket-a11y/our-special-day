@@ -36,7 +36,7 @@ const LanguageSwitcher = () => {
         <Button
           variant="ghost"
           size="sm"
-          className="gap-2 text-muted-foreground hover:text-foreground"
+          className="gap-2 text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] touch-manipulation"
         >
           <Globe className="w-4 h-4" />
           <span className="hidden sm:inline">{currentLanguage.nativeName}</span>

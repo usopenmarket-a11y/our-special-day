@@ -10,25 +10,20 @@ const LanguageInitializer = () => {
 
   useEffect(() => {
     // Set initial direction and language immediately
-    const currentLang = i18n.language || 'en';
-    const isRTL = currentLang === 'ar' || currentLang.startsWith('ar-');
-    
-    document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-    document.documentElement.lang = currentLang;
-
-    // Listen for language changes
-    const handleLanguageChanged = (lng: string) => {
-      const isRTL = lng === 'ar' || lng.startsWith('ar-');
+    const updateDirection = (lang: string) => {
+      const currentLang = lang || i18n.language || 'en';
+      const isRTL = currentLang === 'ar' || currentLang.startsWith('ar-');
+      
       document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
-      document.documentElement.lang = lng;
+      document.documentElement.lang = currentLang;
     };
 
-    i18n.on('languageChanged', handleLanguageChanged);
+    // Set initial direction
+    updateDirection(i18n.language);
 
-    return () => {
-      i18n.off('languageChanged', handleLanguageChanged);
-    };
-  }, [i18n]);
+    // Listen for language changes using useEffect dependency instead of event listeners
+    // This is more reliable and doesn't require i18n.on/off methods
+  }, [i18n.language]); // Re-run when language changes
 
   return null; // This component doesn't render anything
 };

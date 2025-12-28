@@ -75,7 +75,8 @@ const Navigation = () => {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden w-10 h-10 flex items-center justify-center text-foreground"
+              className="md:hidden min-w-[44px] min-h-[44px] w-11 h-11 flex items-center justify-center text-foreground touch-manipulation"
+              aria-label="Open menu"
             >
               <Menu className="w-6 h-6" />
             </button>

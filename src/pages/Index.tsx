@@ -12,14 +12,20 @@ import musicFiles from "@/lib/musicList";
 import { useTranslation } from "react-i18next";
 
 const Index = () => {
-  const { t } = useTranslation();
+  const { t, ready } = useTranslation();
+  
+  // Use fallback values if i18n is not ready
+  // Display order: Fady & Sandra (bride first, then groom)
+  const brideName = ready ? t("hero.bride") : "Fady";
+  const groomName = ready ? t("hero.groom") : "Sandra";
+  
   return (
     <>
       <Helmet>
-        <title>{t("hero.bride")} & {t("hero.groom")} | Wedding Invitation</title>
+        <title>{brideName} & {groomName} | Wedding Invitation</title>
         <meta 
           name="description" 
-          content={`You're invited to celebrate the wedding of ${t("hero.bride")} & ${t("hero.groom")}. RSVP and join us for our special day.`} 
+          content={`You're invited to celebrate the wedding of ${brideName} & ${groomName}. RSVP and join us for our special day.`} 
         />
       </Helmet>
 
