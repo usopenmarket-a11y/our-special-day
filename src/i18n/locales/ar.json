@@ -106,26 +106,6 @@
     "loading": "جاري التحميل...",
     "error": "خطأ",
     "success": "نجح"
-  },
-  "error": {
-    "somethingWentWrong": "حدث خطأ ما",
-    "unexpectedError": "حدث خطأ غير متوقع",
-    "reloadPage": "إعادة تحميل الصفحة",
-    "errorDetails": "تفاصيل الخطأ"
-  },
-  "music": {
-    "nextSong": "الأغنية التالية",
-    "playMusic": "تشغيل الموسيقى",
-    "pauseMusic": "إيقاف الموسيقى",
-    "unmuteMusic": "إلغاء كتم الصوت",
-    "muteMusic": "كتم الصوت",
-    "audioError": "تعذر تشغيل الصوت. قد يتطلب المتصفح تفاعل المستخدم.",
-    "unknownError": "خطأ غير معروف"
-  },
-  "upload": {
-    "uploadUnavailable": "الرفع غير متاح",
-    "uploadUnavailableMessage": "مجلد الرفع غير مُكوّن. يرجى الاتصال بالمسؤول.",
-    "uploadFailed": "فشل الرفع"
   }
 }
 

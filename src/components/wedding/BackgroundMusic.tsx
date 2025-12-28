@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Volume2, VolumeX, AlertCircle, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTranslation } from "react-i18next";
 
 interface BackgroundMusicProps {
   src: string | string[]; // Support both single URL and playlist
@@ -12,7 +11,6 @@ interface BackgroundMusicProps {
 }
 
 const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: BackgroundMusicProps) => {
-  const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +57,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         console.log("🎵 ✅ Audio started on user interaction");
       } catch (error) {
         console.error("Failed to play audio:", error);
-        setError(t("music.audioError"));
+        setError("Could not play audio. Browser may require user interaction.");
       }
     }
   }, [startMuted]);
@@ -84,7 +82,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // Handle audio load errors
     const handleError = () => {
       const errorCode = audio.error?.code;
-      const errorMsg = audio.error?.message || t("music.unknownError");
+      const errorMsg = audio.error?.message || "Unknown error";
       
       let detailedError = `Failed to load: ${currentSong.substring(0, 50)}...`;
       
@@ -225,72 +223,18 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
     // Add listeners for user interaction (multiple events for better coverage)
     // Includes click, touch, scroll, and keyboard events
-    // Mobile-specific: touchstart, touchmove, touchend, scroll (with better mobile support)
-    const interactionEvents = [
-      'click', 
-      'touchstart', 
-      'touchmove',  // Mobile scrolling
-      'touchend',   // Mobile touch end
-      'mousedown', 
-      'keydown', 
-      'scroll', 
-      'wheel',
-      'pointerdown' // Pointer events for better mobile support
-    ];
-    
-    // Track if interaction already happened to prevent multiple calls
-    let interactionHandled = false;
-    const handleInteractionOnce = (event: Event) => {
-      if (interactionHandled) return;
-      interactionHandled = true;
-      handleFirstInteraction();
-    };
-    
+    const interactionEvents = ['click', 'touchstart', 'mousedown', 'keydown', 'scroll', 'wheel'];
     interactionEvents.forEach(eventType => {
-      // Use capture phase for better mobile detection
-      // Remove 'once' option and handle it manually for better mobile scroll support
-      document.addEventListener(eventType, handleInteractionOnce, { 
-        passive: true, 
-        capture: true 
-      });
+      document.addEventListener(eventType, handleFirstInteraction, { once: true, passive: true });
     });
-    
-    // Special handling for mobile scroll - use a more aggressive approach
-    let scrollTimeout: number | null = null;
-    const handleMobileScroll = () => {
-      if (interactionHandled) return;
-      
-      // Clear previous timeout
-      if (scrollTimeout !== null) {
-        clearTimeout(scrollTimeout);
-      }
-      
-      // Set a small delay to detect actual scrolling (not just touch)
-      scrollTimeout = window.setTimeout(() => {
-        if (!interactionHandled) {
-          interactionHandled = true;
-          handleFirstInteraction();
-        }
-      }, 100);
-    };
-    
-    // Add scroll listener with better mobile support
-    window.addEventListener('scroll', handleMobileScroll, { passive: true, capture: true });
-    // Also listen on document for better mobile coverage
-    document.addEventListener('scroll', handleMobileScroll, { passive: true, capture: true });
 
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
-      if (scrollTimeout !== null) {
-        clearTimeout(scrollTimeout);
-      }
       // Remove interaction listeners
       interactionEvents.forEach(eventType => {
-        document.removeEventListener(eventType, handleInteractionOnce, { capture: true });
+        document.removeEventListener(eventType, handleFirstInteraction);
       });
-      window.removeEventListener('scroll', handleMobileScroll, { capture: true });
-      document.removeEventListener('scroll', handleMobileScroll, { capture: true });
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("ended", handleEnded);
       audio.removeEventListener("play", handlePlay);
@@ -470,7 +414,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
                 variant="outline"
                 size="icon"
                 className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
-                aria-label={t("music.nextSong")}
+                aria-label="Next song"
               >
                 <SkipForward className="w-5 h-5 text-gold" />
               </Button>
@@ -480,7 +424,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
               variant="outline"
               size="icon"
               className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
-              aria-label={isPlaying ? t("music.pauseMusic") : t("music.playMusic")}
+              aria-label={isPlaying ? "Pause music" : "Play music"}
             >
               <AnimatePresence mode="wait">
                 {isPlaying ? (
@@ -507,7 +451,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
               variant="outline"
               size="icon"
               className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
-              aria-label={isMuted ? t("music.unmuteMusic") : t("music.muteMusic")}
+              aria-label={isMuted ? "Unmute music" : "Mute music"}
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-gold" />

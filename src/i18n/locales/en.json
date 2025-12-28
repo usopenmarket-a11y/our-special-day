@@ -106,26 +106,6 @@
     "loading": "Loading...",
     "error": "Error",
     "success": "Success"
-  },
-  "error": {
-    "somethingWentWrong": "Something went wrong",
-    "unexpectedError": "An unexpected error occurred",
-    "reloadPage": "Reload Page",
-    "errorDetails": "Error Details"
-  },
-  "music": {
-    "nextSong": "Next song",
-    "playMusic": "Play music",
-    "pauseMusic": "Pause music",
-    "unmuteMusic": "Unmute music",
-    "muteMusic": "Mute music",
-    "audioError": "Could not play audio. Browser may require user interaction.",
-    "unknownError": "Unknown error"
-  },
-  "upload": {
-    "uploadUnavailable": "Upload unavailable",
-    "uploadUnavailableMessage": "Upload folder not configured. Please contact the administrator.",
-    "uploadFailed": "Upload failed"
   }
 }
 
