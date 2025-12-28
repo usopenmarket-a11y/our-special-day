@@ -15,7 +15,7 @@ const HeroSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 py-20 overflow-hidden gradient-hero">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-20 md:py-24 overflow-hidden gradient-hero">
       {/* Decorative elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 left-10 w-32 h-32 bg-rose/20 rounded-full blur-3xl animate-float" />
@@ -31,12 +31,12 @@ const HeroSection = () => {
       {/* Subtle gradient overlay */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/20 pointer-events-none" />
 
-      <div className="relative z-10 text-center max-w-4xl mx-auto">
+      <div className="relative z-10 text-center max-w-4xl mx-auto px-4 sm:px-6">
         <motion.p
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="text-sm md:text-base font-body text-muted-foreground uppercase tracking-[0.3em] mb-8"
+          className="text-xs sm:text-sm md:text-base font-body text-muted-foreground uppercase tracking-[0.2em] sm:tracking-[0.3em] mb-6 sm:mb-8"
         >
           {t("hero.togetherWithFamilies")}
         </motion.p>
@@ -45,12 +45,12 @@ const HeroSection = () => {
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="mb-6"
+          className="mb-4 sm:mb-6"
         >
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-semibold text-foreground leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-display font-semibold text-foreground leading-tight px-2">
             {t("hero.bride")}
-            <span className="inline-flex items-center mx-4 md:mx-6">
-              <Heart className="w-8 h-8 md:w-12 md:h-12 text-gold fill-gold/30" />
+            <span className="inline-flex items-center mx-2 sm:mx-3 md:mx-4 lg:mx-6">
+              <Heart className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 text-gold fill-gold/30" />
             </span>
             {t("hero.groom")}
           </h1>
@@ -60,18 +60,18 @@ const HeroSection = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex items-center justify-center gap-4 mb-8"
+          className="flex items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8"
         >
-          <div className="w-16 md:w-24 h-px bg-gradient-to-r from-transparent to-gold/50" />
-          <span className="text-gold text-lg">✦</span>
-          <div className="w-16 md:w-24 h-px bg-gradient-to-l from-transparent to-gold/50" />
+          <div className="w-12 sm:w-16 md:w-24 h-px bg-gradient-to-r from-transparent to-gold/50" />
+          <span className="text-gold text-base sm:text-lg">✦</span>
+          <div className="w-12 sm:w-16 md:w-24 h-px bg-gradient-to-l from-transparent to-gold/50" />
         </motion.div>
 
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="text-lg md:text-xl font-body text-muted-foreground mb-4 max-w-2xl mx-auto italic"
+          className="text-base sm:text-lg md:text-xl font-body text-muted-foreground mb-3 sm:mb-4 max-w-2xl mx-auto italic px-4"
         >
           {t("hero.invitation")}
         </motion.p>
@@ -80,7 +80,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="text-2xl md:text-3xl font-display font-medium text-foreground mb-8"
+          className="text-xl sm:text-2xl md:text-3xl font-display font-medium text-foreground mb-6 sm:mb-8 px-4"
         >
           {formattedDate}
         </motion.p>
@@ -90,12 +90,12 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.7 }}
-          className="mb-12 max-w-2xl mx-auto"
+          className="mb-8 sm:mb-12 max-w-2xl mx-auto px-4"
         >
-          <blockquote className="text-base md:text-lg font-body text-muted-foreground italic border-l-2 border-gold/50 pl-4 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-4">
+          <blockquote className="text-sm sm:text-base md:text-lg font-body text-muted-foreground italic border-l-2 border-gold/50 pl-3 sm:pl-4 rtl:border-l-0 rtl:border-r-2 rtl:pl-0 rtl:pr-3 sm:rtl:pr-4">
             "{t("hero.bibleVerse.text")}"
           </blockquote>
-          <p className="text-sm font-body text-gold mt-2">— {t("hero.bibleVerse.reference")}</p>
+          <p className="text-sm sm:text-base font-body text-gold font-medium mt-2">— {t("hero.bibleVerse.reference")}</p>
         </motion.div>
 
         <motion.div

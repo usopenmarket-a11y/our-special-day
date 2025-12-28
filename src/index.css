@@ -56,9 +56,9 @@
 
     --radius: 0.5rem;
 
-    /* Custom pastel wedding tokens */
-    --gold: 45 55% 78%;
-    --gold-light: 45 50% 88%;
+    /* Custom pastel wedding tokens - enhanced for better visibility */
+    --gold: 45 65% 65%;
+    --gold-light: 45 60% 75%;
     --blush: 340 40% 90%;
     --cream: 40 45% 96%;
     --sage: 150 30% 82%;

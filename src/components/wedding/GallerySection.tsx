@@ -109,14 +109,14 @@ const GallerySection = () => {
 
 
   return (
-    <section id="gallery" className="py-24 px-4 relative overflow-hidden">
+    <section id="gallery" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 right-10 w-64 h-64 bg-rose/5 rounded-full blur-3xl" />
         <div className="absolute bottom-20 left-10 w-64 h-64 bg-gold/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-7xl mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10 px-2 sm:px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -129,7 +129,7 @@ const GallerySection = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-sm font-body text-gold uppercase tracking-[0.3em] mb-4"
+            className="text-sm sm:text-base font-body text-gold font-semibold uppercase tracking-[0.3em] mb-4"
           >
             {t("gallery.ourMoments")}
           </motion.p>
@@ -234,15 +234,15 @@ const GallerySection = () => {
             </Carousel>
 
             {/* Carousel Indicators */}
-            <div className="flex justify-center gap-2 mt-8">
+            <div className="flex justify-center gap-2 mt-6 sm:mt-8">
               {images.slice(0, Math.min(images.length, 10)).map((_, index) => (
                 <button
                   key={index}
                   onClick={() => api?.scrollTo(index)}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                  className={`h-2 sm:h-1.5 rounded-full transition-all duration-300 touch-manipulation ${
                     Math.abs(current - index) <= 1
-                      ? "w-8 bg-gold"
-                      : "w-1.5 bg-gold/30 hover:bg-gold/50"
+                      ? "w-8 sm:w-8 bg-gold"
+                      : "w-2 sm:w-1.5 bg-gold/30 hover:bg-gold/50 active:bg-gold/70"
                   }`}
                   aria-label={`Go to slide ${index + 1}`}
                 />

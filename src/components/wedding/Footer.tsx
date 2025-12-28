@@ -6,13 +6,13 @@ import { useTranslation } from "react-i18next";
 const Footer = () => {
   const { t } = useTranslation();
   return (
-    <footer className="py-20 px-4 border-t border-border/50 relative overflow-hidden">
+    <footer className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 border-t border-border/50 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gold/3 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-4xl mx-auto text-center relative z-10">
+      <div className="max-w-4xl mx-auto text-center relative z-10 px-2 sm:px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -31,11 +31,11 @@ const Footer = () => {
             <div className="w-20 h-px bg-gradient-to-l from-transparent to-gold/50" />
           </div>
 
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-display font-semibold text-foreground mb-6">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-semibold text-foreground mb-4 sm:mb-6 px-4">
             {t("hero.bride")} & {t("hero.groom")}
           </h2>
 
-          <p className="text-lg font-body text-muted-foreground mb-10 italic max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg font-body text-muted-foreground mb-6 sm:mb-8 md:mb-10 italic max-w-2xl mx-auto px-4">
             {t("footer.closing")}
           </p>
 

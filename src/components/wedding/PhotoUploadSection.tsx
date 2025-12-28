@@ -177,14 +177,14 @@ const PhotoUploadSection = () => {
   const uploadedFiles = files.filter((f) => f.status === "success");
 
   return (
-    <section id="upload" className="py-24 px-4 bg-secondary/30 relative overflow-hidden">
+    <section id="upload" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 bg-secondary/30 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gold/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-blush/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-4xl mx-auto relative z-10 px-2 sm:px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -197,7 +197,7 @@ const PhotoUploadSection = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-sm font-body text-gold uppercase tracking-[0.3em] mb-4"
+            className="text-sm sm:text-base font-body text-gold font-semibold uppercase tracking-[0.3em] mb-4"
           >
             {t("upload.shareTheLove")}
           </motion.p>
@@ -227,16 +227,16 @@ const PhotoUploadSection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <Card className="p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm">
+          <Card className="p-4 sm:p-6 md:p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm">
             {/* Drop Zone */}
             <div
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              className={`relative border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
+              className={`relative border-2 border-dashed rounded-xl p-8 sm:p-10 md:p-12 text-center transition-all duration-300 ${
                 isDragging
                   ? "border-gold bg-gold/10 shadow-glow scale-[1.02]"
-                  : "border-border hover:border-gold/50 hover:bg-gold/5"
+                  : "border-border hover:border-gold/50 hover:bg-gold/5 active:border-gold/70"
               }`}
             >
               <input
@@ -244,22 +244,22 @@ const PhotoUploadSection = () => {
                 accept="image/*"
                 multiple
                 onChange={(e) => e.target.files && handleFiles(e.target.files)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-manipulation"
               />
 
-              <div className="flex flex-col items-center gap-4">
+              <div className="flex flex-col items-center gap-3 sm:gap-4">
                 <motion.div
                   animate={isDragging ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }}
                   transition={{ duration: 0.3 }}
-                  className="w-20 h-20 rounded-full bg-gold/10 flex items-center justify-center"
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gold/10 flex items-center justify-center"
                 >
-                  <Camera className="w-10 h-10 text-gold" />
+                  <Camera className="w-8 h-8 sm:w-10 sm:h-10 text-gold" />
                 </motion.div>
                 <div>
-                  <p className="text-lg font-display font-medium text-foreground mb-1">
+                  <p className="text-base sm:text-lg font-display font-medium text-foreground mb-1">
                     {t("upload.dragDrop")}
                   </p>
-                  <p className="text-sm font-body text-muted-foreground">
+                  <p className="text-xs sm:text-sm font-body text-muted-foreground">
                     {t("upload.orClick")}
                   </p>
                 </div>
@@ -282,7 +282,7 @@ const PhotoUploadSection = () => {
                   {pendingFiles.length > 0 && (
                     <Button
                       onClick={uploadFiles}
-                      className="bg-gold hover:bg-gold/90 text-primary-foreground"
+                      className="bg-gold hover:bg-gold/90 text-primary-foreground h-10 sm:h-auto px-4 sm:px-6 text-sm sm:text-base touch-manipulation"
                     >
                       <Upload className="w-4 h-4 mr-2" />
                       {t("upload.uploadAll")}
@@ -290,7 +290,7 @@ const PhotoUploadSection = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                   {files.map((uploadFile) => (
                     <div
                       key={uploadFile.id}

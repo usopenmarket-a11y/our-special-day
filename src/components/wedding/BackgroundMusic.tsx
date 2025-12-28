@@ -390,7 +390,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
             <motion.div
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1.5, repeat: Infinity }}
-              className="text-sm text-gold uppercase tracking-wider"
+              className="text-sm sm:text-base text-gold font-semibold uppercase tracking-wider"
             >
               Tap to Start →
             </motion.div>

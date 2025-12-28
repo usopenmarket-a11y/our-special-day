@@ -52,7 +52,7 @@ const Navigation = () => {
             {/* Logo */}
             <button
               onClick={() => scrollToSection("#home")}
-              className="font-display text-xl md:text-2xl font-semibold text-foreground"
+              className="font-display text-xl md:text-2xl font-semibold text-foreground py-2.5 px-3 min-h-[44px] min-w-[44px] touch-manipulation"
             >
               {t("hero.bride")} & {t("hero.groom")}
             </button>

@@ -249,7 +249,7 @@ const RSVPSection = () => {
 
   if (isSubmitted) {
     return (
-      <section id="rsvp" className="py-24 px-4 bg-secondary/30 relative overflow-hidden">
+      <section id="rsvp" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 bg-secondary/30 relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-96 h-96 bg-rose/5 rounded-full blur-3xl" />
@@ -288,7 +288,7 @@ const RSVPSection = () => {
   }
 
   return (
-    <section id="rsvp" className="py-24 px-4 bg-secondary/30 relative overflow-hidden">
+    <section id="rsvp" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 bg-secondary/30 relative overflow-hidden">
       {/* Decorative background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-96 h-96 bg-rose/5 rounded-full blur-3xl" />
@@ -308,7 +308,7 @@ const RSVPSection = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-xs md:text-sm font-body text-gold uppercase tracking-[0.3em] mb-3 md:mb-4"
+            className="text-sm md:text-base font-body text-gold font-semibold uppercase tracking-[0.3em] mb-3 md:mb-4"
           >
             {t("rsvp.subtitle")}
           </motion.p>
@@ -329,7 +329,7 @@ const RSVPSection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <Card className="p-4 sm:p-6 md:p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm">
+          <Card className="p-4 sm:p-6 md:p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm min-h-[200px]">
             <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
               {/* Guest Search */}
               <div className="space-y-3 md:space-y-4">
@@ -355,7 +355,7 @@ const RSVPSection = () => {
                           handleSearch();
                         }
                       }}
-                      className="font-body pl-10 md:pl-12 h-11 md:h-12 text-base"
+                      className="font-body pl-10 md:pl-12 h-11 md:h-12 text-base px-3 sm:px-4"
                       disabled={!canSearch()}
                     />
                   </div>
@@ -386,7 +386,7 @@ const RSVPSection = () => {
                 )}
 
                 {searchQuery.length >= 2 && guests.length > 0 && (
-                  <div className="space-y-3 max-h-64 md:max-h-80 overflow-y-auto p-3 md:p-4 border rounded-lg bg-card">
+                  <div className="space-y-3 max-h-64 md:max-h-80 overflow-y-auto p-3 sm:p-4 md:p-4 border rounded-lg bg-card">
                     {(() => {
                       // Group guests by family
                       const groupedGuests = new Map<string, GuestInfo[]>();
@@ -420,7 +420,7 @@ const RSVPSection = () => {
                               <button
                                 type="button"
                                 onClick={() => allSelected ? deselectAllInFamily(familyGroup) : selectAllInFamily(familyGroup)}
-                                className="text-xs md:text-sm text-gold hover:text-gold/80 font-medium px-2 py-1 touch-manipulation active:scale-95"
+                                className="text-sm md:text-base text-gold hover:text-gold/90 font-semibold px-3 py-1.5 touch-manipulation active:scale-95"
                               >
                                 {allSelected ? t("rsvp.deselectAll") : t("rsvp.selectAll")}
                               </button>
@@ -551,7 +551,7 @@ const RSVPSection = () => {
               <Button
                 type="submit"
                 disabled={isSubmitting || selectedGuests.length === 0 || !attendance}
-                className="w-full py-5 md:py-6 text-base md:text-lg font-display bg-gold hover:bg-gold/90 text-primary-foreground touch-manipulation active:scale-95 transition-transform"
+                className="w-full h-12 md:h-14 py-4 md:py-6 text-base md:text-lg font-display bg-gold hover:bg-gold/90 text-primary-foreground touch-manipulation active:scale-95 transition-transform"
               >
                 {isSubmitting ? (
                   <>
