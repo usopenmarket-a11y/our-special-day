@@ -32,7 +32,12 @@ serve(async (req) => {
     const csvText = await response.text();
     console.log("CSV fetched successfully, parsing...");
     
-    // Parse CSV - Column A: Name, Column B: Family Group
+    // Parse CSV - Google Sheets column structure:
+    // Column A (index 0): Name
+    // Column B (index 1): Family Group
+    // Column C (index 2): Confirmation (not read here)
+    // Column D (index 3): Date (not read here)
+    // Column E (index 4): Time (not read here)
     const lines = csvText.split('\n');
     const guests: { name: string; rowIndex: number; familyGroup?: string }[] = [];
     
@@ -40,15 +45,15 @@ serve(async (req) => {
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line) {
-        // Parse CSV columns (handle quoted values)
+        // Parse CSV columns (handle quoted values with commas)
         const columns = parseCSVLine(line);
-        const name = columns[0]?.replace(/"/g, '').trim();
-        const familyGroup = columns[1]?.replace(/"/g, '').trim() || '';
+        const name = columns[0]?.replace(/"/g, '').trim(); // Column A: Name
+        const familyGroup = columns[1]?.replace(/"/g, '').trim() || ''; // Column B: Family Group
         
         if (name && name.length > 0) {
           guests.push({ 
             name, 
-            rowIndex: i - 1, // rowIndex is 0-based (excluding header)
+            rowIndex: i - 1, // rowIndex is 0-based (excluding header), used to write back to correct row
             familyGroup: familyGroup || undefined
           });
         }

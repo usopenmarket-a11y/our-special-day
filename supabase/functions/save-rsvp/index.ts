@@ -148,9 +148,23 @@ serve(async (req) => {
     const guestNames: string[] = [];
 
     for (const guest of guests) {
+      // Calculate actual row number in Google Sheets
+      // rowIndex is 0-based (excluding header), so:
+      // - Header row = row 1
+      // - First data row = row 2 (rowIndex 0 + 2)
       const actualRow = guest.rowIndex + 2;
-      const range = `Sheet1!C${actualRow}:E${actualRow}`; // Column C: Confirmation, D: Date, E: Time
-      updates.push({ range, values: [[confirmationText, date, time]] });
+      
+      // Google Sheets column structure:
+      // Column A: Name (not updated)
+      // Column B: Family Group (not updated)
+      // Column C: Confirmation (updated)
+      // Column D: Date (updated)
+      // Column E: Time (updated)
+      const range = `Sheet1!C${actualRow}:E${actualRow}`;
+      updates.push({ 
+        range, 
+        values: [[confirmationText, date, time]] // [Confirmation, Date, Time]
+      });
       guestNames.push(guest.name);
     }
 

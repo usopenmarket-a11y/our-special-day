@@ -329,14 +329,14 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
               Start the Music
             </h3>
             <p className="text-lg text-muted-foreground mb-6">
-              Click, tap, or scroll to begin
+              Tap to begin
             </p>
             <motion.div
               animate={{ opacity: [0.5, 1, 0.5] }}
               transition={{ duration: 1.5, repeat: Infinity }}
               className="text-sm text-gold uppercase tracking-wider"
             >
-              Click, Tap, or Scroll to Start →
+              Tap to Start →
             </motion.div>
           </motion.div>
         </motion.div>
