@@ -301,14 +301,14 @@ const RSVPSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-8 md:mb-16"
         >
           <motion.p
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-sm font-body text-gold uppercase tracking-[0.3em] mb-4"
+            className="text-xs md:text-sm font-body text-gold uppercase tracking-[0.3em] mb-3 md:mb-4"
           >
             {t("rsvp.subtitle")}
           </motion.p>
@@ -317,7 +317,7 @@ const RSVPSection = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-display font-semibold text-foreground mb-4"
+            className="text-3xl md:text-5xl lg:text-6xl font-display font-semibold text-foreground mb-4"
           >
             {t("rsvp.title")}
           </motion.h2>
@@ -329,21 +329,21 @@ const RSVPSection = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <Card className="p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm">
-            <form onSubmit={handleSubmit} className="space-y-8">
+          <Card className="p-4 sm:p-6 md:p-8 lg:p-10 shadow-soft border-gold/10 bg-card/80 backdrop-blur-sm">
+            <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
               {/* Guest Search */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-base font-display">{t("rsvp.selectName")}</Label>
+              <div className="space-y-3 md:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <Label className="text-sm md:text-base font-display">{t("rsvp.selectName")}</Label>
                   {searchCount > 0 && (
                     <span className="text-xs text-muted-foreground font-body">
                       {t("rsvp.searchesRemaining", { count: getRemainingSearches() })}
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 md:gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder={t("rsvp.searchPlaceholder")}
@@ -355,7 +355,7 @@ const RSVPSection = () => {
                           handleSearch();
                         }
                       }}
-                      className="font-body pl-10"
+                      className="font-body pl-10 md:pl-12 h-11 md:h-12 text-base"
                       disabled={!canSearch()}
                     />
                   </div>
@@ -363,16 +363,17 @@ const RSVPSection = () => {
                     type="button"
                     onClick={handleSearch}
                     disabled={isLoading || !canSearch() || searchQuery.length < 2}
-                    className="px-6 bg-gold hover:bg-gold/90 text-primary-foreground"
+                    className="h-11 md:h-12 px-6 bg-gold hover:bg-gold/90 text-primary-foreground text-base font-medium"
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t("rsvp.searching")}
+                        <Loader2 className="w-4 h-4 md:w-5 md:h-5 mr-2 animate-spin" />
+                        <span className="hidden sm:inline">{t("rsvp.searching")}</span>
+                        <span className="sm:hidden">{t("rsvp.searching")}</span>
                       </>
                     ) : (
                       <>
-                        <Search className="w-4 h-4 mr-2" />
+                        <Search className="w-4 h-4 md:w-5 md:h-5 mr-2" />
                         {t("rsvp.search")}
                       </>
                     )}
@@ -385,7 +386,7 @@ const RSVPSection = () => {
                 )}
 
                 {searchQuery.length >= 2 && guests.length > 0 && (
-                  <div className="space-y-3 max-h-64 overflow-y-auto p-3 border rounded-lg bg-card">
+                  <div className="space-y-3 max-h-64 md:max-h-80 overflow-y-auto p-3 md:p-4 border rounded-lg bg-card">
                     {(() => {
                       // Group guests by family
                       const groupedGuests = new Map<string, GuestInfo[]>();
@@ -409,17 +410,17 @@ const RSVPSection = () => {
                         const allSelected = areAllFamilySelected(familyGroup);
                         result.push(
                           <div key={familyGroup} className="space-y-2 pb-3 border-b border-border/50 last:border-b-0">
-                            <div className="flex items-center justify-between px-2">
+                            <div className="flex items-center justify-between px-2 py-1">
                               <div className="flex items-center gap-2">
-                                <Users className="w-4 h-4 text-gold" />
-                                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                                <Users className="w-4 h-4 md:w-5 md:h-5 text-gold" />
+                                <span className="text-xs md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                                   {familyGroup}
                                 </span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => allSelected ? deselectAllInFamily(familyGroup) : selectAllInFamily(familyGroup)}
-                                className="text-xs text-gold hover:text-gold/80 font-medium"
+                                className="text-xs md:text-sm text-gold hover:text-gold/80 font-medium px-2 py-1 touch-manipulation active:scale-95"
                               >
                                 {allSelected ? t("rsvp.deselectAll") : t("rsvp.selectAll")}
                               </button>
@@ -430,17 +431,18 @@ const RSVPSection = () => {
                                 return (
                                   <label
                                     key={`${guest.name}-${index}`}
-                                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                                    className={`flex items-center gap-3 p-3 md:p-2 rounded-md cursor-pointer transition-colors touch-manipulation active:scale-[0.98] ${
                                       isSelected
                                         ? "bg-gold/10 border border-gold/30"
-                                        : "hover:bg-muted/50"
+                                        : "hover:bg-muted/50 active:bg-muted/70"
                                     }`}
                                   >
                                     <Checkbox
                                       checked={isSelected}
                                       onCheckedChange={() => toggleGuestSelection(guest)}
+                                      className="w-5 h-5 md:w-4 md:h-4"
                                     />
-                                    <span className="font-body text-foreground flex-1">{guest.name}</span>
+                                    <span className="font-body text-sm md:text-base text-foreground flex-1">{guest.name}</span>
                                   </label>
                                 );
                               })}
@@ -482,10 +484,10 @@ const RSVPSection = () => {
                 )}
 
                 {selectedGuests.length > 0 && (
-                  <div className="space-y-2 p-3 bg-gold/10 rounded-lg border border-gold/20">
+                  <div className="space-y-2 p-3 md:p-4 bg-gold/10 rounded-lg border border-gold/20">
                     <div className="flex items-center gap-2 mb-2">
-                      <Heart className="w-4 h-4 text-gold" />
-                      <span className="font-body text-sm font-semibold text-foreground">
+                      <Heart className="w-4 h-4 md:w-5 md:h-5 text-gold" />
+                      <span className="font-body text-sm md:text-base font-semibold text-foreground">
                         {t("rsvp.selectedGuests")} ({selectedGuests.length})
                       </span>
                     </div>
@@ -493,15 +495,16 @@ const RSVPSection = () => {
                       {selectedGuests.map((guest, index) => (
                         <div
                           key={`${guest.name}-${index}`}
-                          className="flex items-center gap-1 px-2 py-1 bg-gold/20 rounded-md text-sm"
+                          className="flex items-center gap-1 px-3 py-1.5 md:px-3 md:py-2 bg-gold/20 rounded-md text-sm md:text-base touch-manipulation"
                         >
                           <span className="font-body text-foreground">{guest.name}</span>
                           <button
                             type="button"
                             onClick={() => toggleGuestSelection(guest)}
-                            className="text-muted-foreground hover:text-foreground ml-1"
+                            className="text-muted-foreground hover:text-foreground ml-1 p-1 -mr-1 touch-manipulation"
+                            aria-label={`Remove ${guest.name}`}
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-4 h-4 md:w-4 md:h-4" />
                           </button>
                         </div>
                       ))}
@@ -511,36 +514,36 @@ const RSVPSection = () => {
               </div>
 
               {/* Attendance Selection */}
-              <div className="space-y-4">
-                <Label className="text-base font-display">{t("rsvp.confirmAttendance")}</Label>
+              <div className="space-y-3 md:space-y-4">
+                <Label className="text-sm md:text-base font-display">{t("rsvp.confirmAttendance")}</Label>
                 <RadioGroup
                   value={attendance}
                   onValueChange={(value) => setAttendance(value as "attending" | "not-attending")}
-                  className="grid grid-cols-2 gap-4"
+                  className="grid grid-cols-2 gap-3 md:gap-4"
                 >
                   <Label
                     htmlFor="attending"
-                    className={`flex flex-col items-center gap-2 p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                    className={`flex flex-col items-center justify-center gap-3 md:gap-4 p-4 md:p-6 min-h-[120px] md:min-h-[140px] border-2 rounded-lg cursor-pointer transition-all touch-manipulation active:scale-95 ${
                       attendance === "attending"
-                        ? "border-gold bg-gold/10"
-                        : "border-border hover:border-gold/50"
+                        ? "border-gold bg-gold/10 shadow-md"
+                        : "border-border hover:border-gold/50 active:bg-muted/50"
                     }`}
                   >
                     <RadioGroupItem value="attending" id="attending" className="sr-only" />
-                    <Check className={`w-8 h-8 ${attendance === "attending" ? "text-gold" : "text-muted-foreground"}`} />
-                    <span className="font-display font-medium">{t("rsvp.attending")}</span>
+                    <Check className={`w-10 h-10 md:w-12 md:h-12 ${attendance === "attending" ? "text-gold" : "text-muted-foreground"}`} />
+                    <span className="font-display font-medium text-sm md:text-base text-center">{t("rsvp.attending")}</span>
                   </Label>
                   <Label
                     htmlFor="not-attending"
-                    className={`flex flex-col items-center gap-2 p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                    className={`flex flex-col items-center justify-center gap-3 md:gap-4 p-4 md:p-6 min-h-[120px] md:min-h-[140px] border-2 rounded-lg cursor-pointer transition-all touch-manipulation active:scale-95 ${
                       attendance === "not-attending"
-                        ? "border-rose bg-rose/10"
-                        : "border-border hover:border-rose/50"
+                        ? "border-rose bg-rose/10 shadow-md"
+                        : "border-border hover:border-rose/50 active:bg-muted/50"
                     }`}
                   >
                     <RadioGroupItem value="not-attending" id="not-attending" className="sr-only" />
-                    <X className={`w-8 h-8 ${attendance === "not-attending" ? "text-rose" : "text-muted-foreground"}`} />
-                    <span className="font-display font-medium">{t("rsvp.notAttending")}</span>
+                    <X className={`w-10 h-10 md:w-12 md:h-12 ${attendance === "not-attending" ? "text-rose" : "text-muted-foreground"}`} />
+                    <span className="font-display font-medium text-sm md:text-base text-center">{t("rsvp.notAttending")}</span>
                   </Label>
                 </RadioGroup>
               </div>
@@ -548,9 +551,16 @@ const RSVPSection = () => {
               <Button
                 type="submit"
                 disabled={isSubmitting || selectedGuests.length === 0 || !attendance}
-                className="w-full py-6 text-lg font-display bg-gold hover:bg-gold/90 text-primary-foreground"
+                className="w-full py-5 md:py-6 text-base md:text-lg font-display bg-gold hover:bg-gold/90 text-primary-foreground touch-manipulation active:scale-95 transition-transform"
               >
-                {isSubmitting ? t("rsvp.submitting") : t("rsvp.submit")}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 md:w-6 md:h-6 mr-2 animate-spin inline-block" />
+                    {t("rsvp.submitting")}
+                  </>
+                ) : (
+                  t("rsvp.submit")
+                )}
               </Button>
             </form>
           </Card>
