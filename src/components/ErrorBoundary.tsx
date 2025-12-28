@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { withTranslation, WithTranslation } from 'react-i18next';
 
-interface Props extends WithTranslation {
+interface Props {
   children: ReactNode;
 }
 
@@ -10,7 +9,7 @@ interface State {
   error: Error | null;
 }
 
-class ErrorBoundaryClass extends Component<Props, State> {
+export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -24,11 +23,45 @@ class ErrorBoundaryClass extends Component<Props, State> {
     console.error('Uncaught error:', error, errorInfo);
   }
 
-  public render() {
-    const { t, i18n } = this.props;
-    const isRTL = i18n.language === 'ar';
+  private handleReload = () => {
+    this.setState({ hasError: false, error: null });
+    window.location.reload();
+  };
 
+  private getTranslations() {
+    // Try to get translations from i18n if available
+    try {
+      const i18n = (window as any).i18n;
+      if (i18n && i18n.t) {
+        const lang = i18n.language || 'en';
+        const isRTL = lang === 'ar';
+        return {
+          somethingWentWrong: i18n.t('error.somethingWentWrong', { defaultValue: 'Something went wrong' }),
+          unexpectedError: i18n.t('error.unexpectedError', { defaultValue: 'An unexpected error occurred' }),
+          reloadPage: i18n.t('error.reloadPage', { defaultValue: 'Reload Page' }),
+          errorDetails: i18n.t('error.errorDetails', { defaultValue: 'Error Details' }),
+          isRTL,
+        };
+      }
+    } catch (e) {
+      // i18n not available
+    }
+    
+    // Fallback to English
+    return {
+      somethingWentWrong: 'Something went wrong',
+      unexpectedError: 'An unexpected error occurred',
+      reloadPage: 'Reload Page',
+      errorDetails: 'Error Details',
+      isRTL: false,
+    };
+  }
+
+  public render() {
     if (this.state.hasError) {
+      const translations = this.getTranslations();
+      const isRTL = translations.isRTL;
+
       return (
         <div style={{
           display: 'flex',
@@ -42,16 +75,13 @@ class ErrorBoundaryClass extends Component<Props, State> {
           direction: isRTL ? 'rtl' : 'ltr',
         }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: '#dc2626' }}>
-            {t('error.somethingWentWrong')}
+            {translations.somethingWentWrong}
           </h1>
           <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
-            {this.state.error?.message || t('error.unexpectedError')}
+            {this.state.error?.message || translations.unexpectedError}
           </p>
           <button
-            onClick={() => {
-              this.setState({ hasError: false, error: null });
-              window.location.reload();
-            }}
+            onClick={this.handleReload}
             style={{
               padding: '0.75rem 1.5rem',
               backgroundColor: '#3b82f6',
@@ -62,11 +92,11 @@ class ErrorBoundaryClass extends Component<Props, State> {
               fontSize: '1rem',
             }}
           >
-            {t('error.reloadPage')}
+            {translations.reloadPage}
           </button>
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <details style={{ marginTop: '2rem', textAlign: isRTL ? 'right' : 'left', maxWidth: '800px' }}>
-              <summary style={{ cursor: 'pointer', color: '#6b7280' }}>{t('error.errorDetails')}</summary>
+              <summary style={{ cursor: 'pointer', color: '#6b7280' }}>{translations.errorDetails}</summary>
               <pre style={{
                 marginTop: '1rem',
                 padding: '1rem',
@@ -74,7 +104,7 @@ class ErrorBoundaryClass extends Component<Props, State> {
                 borderRadius: '0.5rem',
                 overflow: 'auto',
                 fontSize: '0.875rem',
-                direction: 'ltr', // Keep code in LTR
+                direction: 'ltr',
                 textAlign: 'left',
               }}>
                 {this.state.error.stack}
@@ -88,6 +118,4 @@ class ErrorBoundaryClass extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export const ErrorBoundary = withTranslation()(ErrorBoundaryClass);
 
