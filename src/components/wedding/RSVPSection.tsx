@@ -5,19 +5,21 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Check, Heart, X, Loader2, Search } from "lucide-react";
+import { Check, Heart, X, Loader2, Search, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
 
 interface GuestInfo {
   name: string;
   rowIndex: number;
+  familyGroup?: string;
 }
 
 const RSVPSection = () => {
   const { t } = useTranslation();
-  const [selectedGuest, setSelectedGuest] = useState<GuestInfo | null>(null);
+  const [selectedGuests, setSelectedGuests] = useState<GuestInfo[]>([]);
   const [attendance, setAttendance] = useState<"attending" | "not-attending" | "">("");
   const [searchQuery, setSearchQuery] = useState("");
   const [guests, setGuests] = useState<GuestInfo[]>([]);
@@ -57,10 +59,43 @@ const RSVPSection = () => {
     return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
+  const toggleGuestSelection = (guest: GuestInfo) => {
+    setSelectedGuests(prev => {
+      const isSelected = prev.some(g => g.name === guest.name && g.rowIndex === guest.rowIndex);
+      if (isSelected) {
+        return prev.filter(g => !(g.name === guest.name && g.rowIndex === guest.rowIndex));
+      } else {
+        return [...prev, guest];
+      }
+    });
+  };
+
+  const selectAllInFamily = (familyGroup: string) => {
+    const familyMembers = guests.filter(g => g.familyGroup === familyGroup);
+    setSelectedGuests(prev => {
+      const existingNames = new Set(prev.map(g => `${g.name}-${g.rowIndex}`));
+      const newMembers = familyMembers.filter(g => !existingNames.has(`${g.name}-${g.rowIndex}`));
+      return [...prev, ...newMembers];
+    });
+  };
+
+  const deselectAllInFamily = (familyGroup: string) => {
+    setSelectedGuests(prev => prev.filter(g => g.familyGroup !== familyGroup));
+  };
+
+  const isGuestSelected = (guest: GuestInfo) => {
+    return selectedGuests.some(g => g.name === guest.name && g.rowIndex === guest.rowIndex);
+  };
+
+  const areAllFamilySelected = (familyGroup: string) => {
+    const familyMembers = guests.filter(g => g.familyGroup === familyGroup);
+    return familyMembers.length > 0 && familyMembers.every(member => isGuestSelected(member));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedGuest || !attendance) {
+    if (selectedGuests.length === 0 || !attendance) {
       toast({
         title: t("rsvp.formIncomplete"),
         description: t("rsvp.formIncompleteMessage"),
@@ -72,12 +107,11 @@ const RSVPSection = () => {
     setIsSubmitting(true);
 
     try {
-      // Save RSVP to Google Sheet
+      // Save RSVP to Google Sheet for all selected guests
       const { data, error } = await supabase.functions.invoke('save-rsvp', {
         body: {
-          guestName: selectedGuest.name,
+          guests: selectedGuests,
           attending: attendance === "attending",
-          rowIndex: selectedGuest.rowIndex,
         },
       });
 
@@ -147,7 +181,7 @@ const RSVPSection = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-3xl md:text-4xl lg:text-5xl font-display font-semibold text-foreground mb-6"
           >
-            {t("rsvp.success")}, {selectedGuest?.name}!
+            {t("rsvp.success")}!
           </motion.h2>
           <motion.p
             initial={{ opacity: 0 }}
@@ -224,25 +258,93 @@ const RSVPSection = () => {
                 </div>
 
                 {searchQuery.length >= 2 && guests.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-lg bg-card">
-                    {guests.map((guest, index) => (
-                      <button
-                        key={`${guest.name}-${index}`}
-                        type="button"
-                        onClick={() => {
-                          setSelectedGuest(guest);
-                          setSearchQuery("");
-                          setGuests([]);
-                        }}
-                        className={`p-3 text-left rounded-md font-body transition-colors ${
-                          selectedGuest?.name === guest.name
-                            ? "bg-gold/20 text-foreground border border-gold/30"
-                            : "hover:bg-muted"
-                        }`}
-                      >
-                        {guest.name}
-                      </button>
-                    ))}
+                  <div className="space-y-3 max-h-64 overflow-y-auto p-3 border rounded-lg bg-card">
+                    {(() => {
+                      // Group guests by family
+                      const groupedGuests = new Map<string, GuestInfo[]>();
+                      const ungroupedGuests: GuestInfo[] = [];
+                      
+                      guests.forEach(guest => {
+                        if (guest.familyGroup) {
+                          if (!groupedGuests.has(guest.familyGroup)) {
+                            groupedGuests.set(guest.familyGroup, []);
+                          }
+                          groupedGuests.get(guest.familyGroup)!.push(guest);
+                        } else {
+                          ungroupedGuests.push(guest);
+                        }
+                      });
+                      
+                      const result: JSX.Element[] = [];
+                      
+                      // Render grouped families
+                      groupedGuests.forEach((familyMembers, familyGroup) => {
+                        const allSelected = areAllFamilySelected(familyGroup);
+                        result.push(
+                          <div key={familyGroup} className="space-y-2 pb-3 border-b border-border/50 last:border-b-0">
+                            <div className="flex items-center justify-between px-2">
+                              <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-gold" />
+                                <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                                  {familyGroup}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => allSelected ? deselectAllInFamily(familyGroup) : selectAllInFamily(familyGroup)}
+                                className="text-xs text-gold hover:text-gold/80 font-medium"
+                              >
+                                {allSelected ? t("rsvp.deselectAll") : t("rsvp.selectAll")}
+                              </button>
+                            </div>
+                            <div className="space-y-1 pl-6">
+                              {familyMembers.map((guest, index) => {
+                                const isSelected = isGuestSelected(guest);
+                                return (
+                                  <label
+                                    key={`${guest.name}-${index}`}
+                                    className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                                      isSelected
+                                        ? "bg-gold/10 border border-gold/30"
+                                        : "hover:bg-muted/50"
+                                    }`}
+                                  >
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() => toggleGuestSelection(guest)}
+                                    />
+                                    <span className="font-body text-foreground flex-1">{guest.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      });
+                      
+                      // Render ungrouped guests
+                      ungroupedGuests.forEach((guest, index) => {
+                        const isSelected = isGuestSelected(guest);
+                        result.push(
+                          <label
+                            key={`${guest.name}-${index}`}
+                            className={`flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors ${
+                              isSelected
+                                ? "bg-gold/10 border border-gold/30"
+                                : "hover:bg-muted/50"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleGuestSelection(guest)}
+                            />
+                            <span className="font-body text-foreground flex-1">{guest.name}</span>
+                          </label>
+                        );
+                      });
+                      
+                      return result;
+                    })()}
                   </div>
                 )}
 
@@ -252,17 +354,31 @@ const RSVPSection = () => {
                   </p>
                 )}
 
-                {selectedGuest && (
-                  <div className="flex items-center gap-2 p-3 bg-gold/10 rounded-lg border border-gold/20">
-                    <Heart className="w-4 h-4 text-gold" />
-                    <span className="font-body text-foreground">{selectedGuest.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGuest(null)}
-                      className="ml-auto text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                {selectedGuests.length > 0 && (
+                  <div className="space-y-2 p-3 bg-gold/10 rounded-lg border border-gold/20">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Heart className="w-4 h-4 text-gold" />
+                      <span className="font-body text-sm font-semibold text-foreground">
+                        {t("rsvp.selectedGuests")} ({selectedGuests.length})
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedGuests.map((guest, index) => (
+                        <div
+                          key={`${guest.name}-${index}`}
+                          className="flex items-center gap-1 px-2 py-1 bg-gold/20 rounded-md text-sm"
+                        >
+                          <span className="font-body text-foreground">{guest.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => toggleGuestSelection(guest)}
+                            className="text-muted-foreground hover:text-foreground ml-1"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -304,7 +420,7 @@ const RSVPSection = () => {
 
               <Button
                 type="submit"
-                disabled={isSubmitting || !selectedGuest || !attendance}
+                disabled={isSubmitting || selectedGuests.length === 0 || !attendance}
                 className="w-full py-6 text-lg font-display bg-gold hover:bg-gold/90 text-primary-foreground"
               >
                 {isSubmitting ? t("rsvp.submitting") : t("rsvp.submit")}

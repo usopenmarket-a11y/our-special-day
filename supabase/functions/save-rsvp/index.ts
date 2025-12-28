@@ -121,45 +121,84 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { guestName, attending, rowIndex } = await req.json();
+    const body = await req.json();
+    
+    // Support both single guest (backward compatible) and multiple guests
+    const guests = body.guests || (body.guestName ? [{ name: body.guestName, rowIndex: body.rowIndex }] : []);
+    const attending = body.attending;
+    
     // Get sheet ID from environment variable (stored in Supabase secrets)
     const sheetId = Deno.env.get('GUEST_SHEET_ID') || '13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs';
 
-    if (!guestName) throw new Error('guestName is required');
+    if (!guests || guests.length === 0) throw new Error('guests array or guestName is required');
+    if (attending === undefined) throw new Error('attending is required');
 
-    console.log(`Saving RSVP for: ${guestName}, attending: ${attending}, row: ${rowIndex}`);
+    console.log(`Saving RSVP for ${guests.length} guest(s), attending: ${attending}`);
 
     const now = new Date();
     const date = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const confirmationText = attending ? 'Yes, Attending' : 'Regretfully Decline';
 
-    const actualRow = rowIndex + 2;
-    const range = `Sheet1!B${actualRow}:D${actualRow}`;
-
     // Obtain service account token with Sheets scope
     const token = await getAccessToken('https://www.googleapis.com/auth/spreadsheets');
 
-    const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+    // Prepare batch update for multiple rows
+    const updates: { range: string; values: string[][] }[] = [];
+    const guestNames: string[] = [];
 
-    const response = await fetch(updateUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ range, majorDimension: 'ROWS', values: [[confirmationText, date, time]] }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Google Sheets API error:', errorText);
-      // Return success: false when write fails so client can handle the error
-      return new Response(JSON.stringify({ success: false, error: 'Failed to save RSVP to Google Sheets', note: errorText, guestName, attending, date, time }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    for (const guest of guests) {
+      const actualRow = guest.rowIndex + 2;
+      const range = `Sheet1!C${actualRow}:E${actualRow}`; // Column C: Confirmation, D: Date, E: Time
+      updates.push({ range, values: [[confirmationText, date, time]] });
+      guestNames.push(guest.name);
     }
 
-    console.log('RSVP saved successfully');
-    return new Response(JSON.stringify({ success: true, message: 'RSVP saved successfully!', guestName, attending, date, time }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Use batchUpdate for multiple rows (more efficient)
+    if (updates.length === 1) {
+      // Single update - use simpler API
+      const { range, values } = updates[0];
+      const updateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+
+      const response = await fetch(updateUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ range, majorDimension: 'ROWS', values }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Google Sheets API error:', errorText);
+        return new Response(JSON.stringify({ success: false, error: 'Failed to save RSVP to Google Sheets', note: errorText, guestNames, attending, date, time }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    } else {
+      // Multiple updates - use batchUpdate
+      const batchUpdateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchUpdate`;
+      
+      const response = await fetch(batchUpdateUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          valueInputOption: 'USER_ENTERED',
+          data: updates.map(({ range, values }) => ({ range, values })),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Google Sheets API error:', errorText);
+        return new Response(JSON.stringify({ success: false, error: 'Failed to save RSVP to Google Sheets', note: errorText, guestNames, attending, date, time }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    console.log(`RSVP saved successfully for ${guests.length} guest(s)`);
+    return new Response(JSON.stringify({ success: true, message: `RSVP saved successfully for ${guests.length} guest(s)!`, guestNames, attending, date, time }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (error) {
     console.error('Error saving RSVP:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

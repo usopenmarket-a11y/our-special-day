@@ -32,33 +32,71 @@ serve(async (req) => {
     const csvText = await response.text();
     console.log("CSV fetched successfully, parsing...");
     
-    // Parse CSV - first column contains guest names
+    // Parse CSV - Column A: Name, Column B: Family Group
     const lines = csvText.split('\n');
-    const guests: { name: string; rowIndex: number }[] = [];
+    const guests: { name: string; rowIndex: number; familyGroup?: string }[] = [];
     
     // Skip header row (index 0)
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line) {
-        // Get the first column (name)
-        const columns = line.split(',');
+        // Parse CSV columns (handle quoted values)
+        const columns = parseCSVLine(line);
         const name = columns[0]?.replace(/"/g, '').trim();
+        const familyGroup = columns[1]?.replace(/"/g, '').trim() || '';
+        
         if (name && name.length > 0) {
-          guests.push({ name, rowIndex: i - 1 }); // rowIndex is 0-based (excluding header)
+          guests.push({ 
+            name, 
+            rowIndex: i - 1, // rowIndex is 0-based (excluding header)
+            familyGroup: familyGroup || undefined
+          });
         }
       }
     }
     
     console.log(`Found ${guests.length} guests`);
     
-    // Filter by search query if provided
+    // Filter by search query and include family members
     let filteredGuests = guests;
     if (searchQuery && searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filteredGuests = guests.filter(guest => 
+      
+      // First, find all guests matching the search query
+      const matchingGuests = guests.filter(guest => 
         guest.name.toLowerCase().includes(query)
       );
-      console.log(`Filtered to ${filteredGuests.length} guests matching "${searchQuery}"`);
+      
+      // Collect all unique family groups from matching guests
+      const familyGroups = new Set<string>();
+      matchingGuests.forEach(guest => {
+        if (guest.familyGroup) {
+          familyGroups.add(guest.familyGroup);
+        }
+      });
+      
+      // Find all guests in the same family groups
+      const relatedGuests = guests.filter(guest => 
+        guest.familyGroup && familyGroups.has(guest.familyGroup)
+      );
+      
+      // Combine matching guests and related family members, remove duplicates
+      // Use rowIndex as key to handle cases where multiple guests might have the same name
+      const allRelatedGuests = new Map<number, { name: string; rowIndex: number; familyGroup?: string }>();
+      
+      // Add matching guests
+      matchingGuests.forEach(guest => {
+        allRelatedGuests.set(guest.rowIndex, guest);
+      });
+      
+      // Add related family members
+      relatedGuests.forEach(guest => {
+        allRelatedGuests.set(guest.rowIndex, guest);
+      });
+      
+      filteredGuests = Array.from(allRelatedGuests.values());
+      
+      console.log(`Found ${matchingGuests.length} matching guests and ${filteredGuests.length} total (including family)`);
     }
     
     return new Response(
@@ -80,3 +118,26 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to parse CSV line (handles quoted values with commas)
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current);
+  return result;
+}

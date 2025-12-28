@@ -11,6 +11,7 @@
     "fix-music-extensions": "node scripts/fix-music-extensions.js",
     "check-music": "node scripts/check-music-files.js",
     "test-audio": "node scripts/test-audio-puppeteer.js",
+    "test-rsvp": "node scripts/test-rsvp-puppeteer.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
