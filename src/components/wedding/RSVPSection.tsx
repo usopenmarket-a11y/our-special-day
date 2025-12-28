@@ -17,6 +17,41 @@ interface GuestInfo {
   familyGroup?: string;
 }
 
+// Rate limiting: 5 searches per day
+const MAX_SEARCHES_PER_DAY = 5;
+const SEARCH_LIMIT_KEY = 'rsvp_search_count';
+const SEARCH_LIMIT_DATE_KEY = 'rsvp_search_date';
+
+const getSearchCount = (): { count: number; date: string } => {
+  const today = new Date().toDateString();
+  const storedDate = localStorage.getItem(SEARCH_LIMIT_DATE_KEY);
+  const storedCount = localStorage.getItem(SEARCH_LIMIT_KEY);
+
+  if (storedDate === today && storedCount) {
+    return { count: parseInt(storedCount, 10), date: today };
+  }
+  return { count: 0, date: today };
+};
+
+const incrementSearchCount = (): number => {
+  const today = new Date().toDateString();
+  const { count } = getSearchCount();
+  const newCount = count + 1;
+  localStorage.setItem(SEARCH_LIMIT_KEY, newCount.toString());
+  localStorage.setItem(SEARCH_LIMIT_DATE_KEY, today);
+  return newCount;
+};
+
+const canSearch = (): boolean => {
+  const { count } = getSearchCount();
+  return count < MAX_SEARCHES_PER_DAY;
+};
+
+const getRemainingSearches = (): number => {
+  const { count } = getSearchCount();
+  return Math.max(0, MAX_SEARCHES_PER_DAY - count);
+};
+
 const RSVPSection = () => {
   const { t } = useTranslation();
   const [selectedGuests, setSelectedGuests] = useState<GuestInfo[]>([]);
@@ -26,44 +61,89 @@ const RSVPSection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [searchCount, setSearchCount] = useState(getSearchCount().count);
   const { toast } = useToast();
 
-  // Fetch guests from Google Sheets when search query changes
-  useEffect(() => {
-    const fetchGuests = async () => {
-      if (searchQuery.length < 2) {
+  // Fetch guests function (called on button click)
+  const handleSearch = async () => {
+    if (searchQuery.length < 2) {
+      toast({
+        title: t("rsvp.searchMinLength"),
+        description: t("rsvp.searchMinLengthMessage"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check rate limit
+    if (!canSearch()) {
+      toast({
+        title: t("rsvp.searchLimitReached"),
+        description: t("rsvp.searchLimitMessage"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-guests', {
+        body: { searchQuery }
+      });
+
+      if (error) {
+        console.error("Error fetching guests:", error);
         setGuests([]);
+        
+        // Check if it's a rate limit error from backend
+        if (error.message?.includes('rate limit') || error.message?.includes('too many')) {
+          toast({
+            title: t("rsvp.searchLimitReached"),
+            description: t("rsvp.searchLimitMessage"),
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: t("rsvp.error"),
+            description: t("rsvp.searchError"),
+            variant: "destructive",
+          });
+        }
         return;
       }
 
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('get-guests', {
-          body: { searchQuery }
+      // Check backend rate limit response
+      if (data?.rateLimited) {
+        toast({
+          title: t("rsvp.searchLimitReached"),
+          description: t("rsvp.searchLimitMessage"),
+          variant: "destructive",
         });
-
-        if (error) {
-          console.error("Error fetching guests:", error);
-          setGuests([]);
-          return;
-        }
-
-        const fetchedGuests = data?.guests || [];
-        console.log(`Fetched ${fetchedGuests.length} guests for query "${searchQuery}"`);
-        fetchedGuests.forEach((g: GuestInfo, i: number) => {
-          console.log(`  ${i + 1}. ${g.name} (Family: ${g.familyGroup || 'None'}, rowIndex: ${g.rowIndex})`);
-        });
-        setGuests(fetchedGuests);
-      } catch (err) {
-        console.error("Failed to fetch guests:", err);
-      } finally {
-        setIsLoading(false);
+        return;
       }
-    };
 
-    const debounceTimer = setTimeout(fetchGuests, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [searchQuery]);
+      const fetchedGuests = data?.guests || [];
+      console.log(`Fetched ${fetchedGuests.length} guests for query "${searchQuery}"`);
+      fetchedGuests.forEach((g: GuestInfo, i: number) => {
+        console.log(`  ${i + 1}. ${g.name} (Family: ${g.familyGroup || 'None'}, rowIndex: ${g.rowIndex})`);
+      });
+      setGuests(fetchedGuests);
+      
+      // Increment search count
+      const newCount = incrementSearchCount();
+      setSearchCount(newCount);
+      
+    } catch (err) {
+      console.error("Failed to fetch guests:", err);
+      toast({
+        title: t("rsvp.error"),
+        description: t("rsvp.searchError"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleGuestSelection = (guest: GuestInfo) => {
     setSelectedGuests(prev => {
@@ -253,20 +333,56 @@ const RSVPSection = () => {
             <form onSubmit={handleSubmit} className="space-y-8">
               {/* Guest Search */}
               <div className="space-y-4">
-                <Label className="text-base font-display">{t("rsvp.selectName")}</Label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder={t("rsvp.searchPlaceholder")}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="font-body pl-10"
-                  />
-                  {isLoading && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gold animate-spin" />
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-display">{t("rsvp.selectName")}</Label>
+                  {searchCount > 0 && (
+                    <span className="text-xs text-muted-foreground font-body">
+                      {t("rsvp.searchesRemaining", { count: getRemainingSearches() })}
+                    </span>
                   )}
                 </div>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder={t("rsvp.searchPlaceholder")}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearch();
+                        }
+                      }}
+                      className="font-body pl-10"
+                      disabled={!canSearch()}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleSearch}
+                    disabled={isLoading || !canSearch() || searchQuery.length < 2}
+                    className="px-6 bg-gold hover:bg-gold/90 text-primary-foreground"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        {t("rsvp.searching")}
+                      </>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4 mr-2" />
+                        {t("rsvp.search")}
+                      </>
+                    )}
+                  </Button>
+                </div>
+                {!canSearch() && (
+                  <p className="text-sm text-rose font-body">
+                    {t("rsvp.searchLimitReached")}
+                  </p>
+                )}
 
                 {searchQuery.length >= 2 && guests.length > 0 && (
                   <div className="space-y-3 max-h-64 overflow-y-auto p-3 border rounded-lg bg-card">

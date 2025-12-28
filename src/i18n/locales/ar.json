@@ -41,9 +41,16 @@
     "formIncompleteMessage": "اختر اسمك وأكد حضورك.",
     "noGuestsFound": "لم يتم العثور على ضيوف",
     "searchMinLength": "اكتب حرفين على الأقل للبحث",
+    "searchMinLengthMessage": "يرجى إدخال حرفين على الأقل للبحث.",
     "selectedGuests": "الضيوف المختارون",
     "selectAll": "اختر الكل",
-    "deselectAll": "إلغاء اختيار الكل"
+    "deselectAll": "إلغاء اختيار الكل",
+    "search": "بحث",
+    "searching": "جاري البحث...",
+    "searchLimitReached": "تم الوصول إلى حد البحث",
+    "searchLimitMessage": "لقد وصلت إلى الحد اليومي للبحث (5 مرات). يرجى المحاولة مرة أخرى غداً.",
+    "searchesRemaining": "{{count}} عمليات بحث متبقية اليوم",
+    "searchError": "فشل البحث. يرجى المحاولة مرة أخرى."
   },
   "details": {
     "joinUs": "انضم إلينا",

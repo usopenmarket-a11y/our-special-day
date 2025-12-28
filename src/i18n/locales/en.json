@@ -41,9 +41,16 @@
     "formIncompleteMessage": "Select your name and confirm your attendance.",
     "noGuestsFound": "No guests found",
     "searchMinLength": "Type at least 2 characters to search",
+    "searchMinLengthMessage": "Please enter at least 2 characters to search.",
     "selectedGuests": "Selected Guests",
     "selectAll": "Select All",
-    "deselectAll": "Deselect All"
+    "deselectAll": "Deselect All",
+    "search": "Search",
+    "searching": "Searching...",
+    "searchLimitReached": "Search limit reached",
+    "searchLimitMessage": "You have reached the daily search limit of 5 searches. Please try again tomorrow.",
+    "searchesRemaining": "{{count}} searches remaining today",
+    "searchError": "Failed to search. Please try again."
   },
   "details": {
     "joinUs": "Join Us",

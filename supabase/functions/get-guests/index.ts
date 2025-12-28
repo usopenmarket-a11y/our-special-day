@@ -5,6 +5,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Rate limiting: 5 searches per day per IP
+const MAX_SEARCHES_PER_DAY = 5;
+const searchCounts = new Map<string, { count: number; date: string }>();
+
+function getClientIdentifier(req: Request): string {
+  // Try to get IP from various headers (for different proxy setups)
+  const forwarded = req.headers.get('x-forwarded-for');
+  const realIp = req.headers.get('x-real-ip');
+  const cfConnectingIp = req.headers.get('cf-connecting-ip');
+  
+  const ip = forwarded?.split(',')[0]?.trim() || 
+             realIp || 
+             cfConnectingIp || 
+             'unknown';
+  
+  return ip;
+}
+
+function canSearch(identifier: string): { allowed: boolean; remaining: number } {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const record = searchCounts.get(identifier);
+  
+  if (!record || record.date !== today) {
+    // New day or new identifier
+    searchCounts.set(identifier, { count: 0, date: today });
+    return { allowed: true, remaining: MAX_SEARCHES_PER_DAY };
+  }
+  
+  if (record.count >= MAX_SEARCHES_PER_DAY) {
+    return { allowed: false, remaining: 0 };
+  }
+  
+  return { allowed: true, remaining: MAX_SEARCHES_PER_DAY - record.count };
+}
+
+function incrementSearchCount(identifier: string): number {
+  const today = new Date().toISOString().split('T')[0];
+  const record = searchCounts.get(identifier);
+  
+  if (!record || record.date !== today) {
+    searchCounts.set(identifier, { count: 1, date: today });
+    return 1;
+  }
+  
+  const newCount = record.count + 1;
+  searchCounts.set(identifier, { count: newCount, date: today });
+  return newCount;
+}
+
+// Clean up old records periodically (keep only today's records)
+function cleanupOldRecords() {
+  const today = new Date().toISOString().split('T')[0];
+  for (const [key, value] of searchCounts.entries()) {
+    if (value.date !== today) {
+      searchCounts.delete(key);
+    }
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -12,7 +71,34 @@ serve(async (req) => {
   }
 
   try {
+    // Clean up old records
+    cleanupOldRecords();
+    
+    // Check rate limit
+    const identifier = getClientIdentifier(req);
+    const rateLimit = canSearch(identifier);
+    
+    if (!rateLimit.allowed) {
+      console.log(`Rate limit exceeded for ${identifier}`);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limit exceeded',
+          rateLimited: true,
+          message: `You have reached the daily search limit of ${MAX_SEARCHES_PER_DAY} searches. Please try again tomorrow.`,
+          remaining: 0
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429 // Too Many Requests
+        }
+      );
+    }
+    
     const { searchQuery } = await req.json();
+    
+    // Increment search count
+    const searchCount = incrementSearchCount(identifier);
+    console.log(`Search ${searchCount}/${MAX_SEARCHES_PER_DAY} for ${identifier}`);
     
     // Get sheet ID from environment variable (stored in Supabase secrets)
     const sheetId = Deno.env.get('GUEST_SHEET_ID') || "13o9Y6YLPMtz-YFREYNu1L4o4dYrj3Dr-V3C_UstGeMs";
@@ -130,7 +216,13 @@ serve(async (req) => {
     }
     
     return new Response(
-      JSON.stringify({ guests: filteredGuests }),
+      JSON.stringify({ 
+        guests: filteredGuests,
+        rateLimit: {
+          remaining: rateLimit.remaining - 1, // Subtract 1 for this search
+          limit: MAX_SEARCHES_PER_DAY
+        }
+      }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
