@@ -140,7 +140,7 @@ const PhotoUploadSection = () => {
             )
           );
           toast({
-            title: "Upload failed",
+            title: t("upload.uploadFailed"),
             description: backendError,
             variant: "destructive",
           });

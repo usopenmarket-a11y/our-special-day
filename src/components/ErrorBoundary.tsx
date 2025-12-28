@@ -1,6 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { withTranslation, WithTranslation } from 'react-i18next';
 
-interface Props {
+interface Props extends WithTranslation {
   children: ReactNode;
 }
 
@@ -9,7 +10,7 @@ interface State {
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundaryClass extends Component<Props, State> {
   public state: State = {
     hasError: false,
     error: null,
@@ -24,6 +25,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public render() {
+    const { t, i18n } = this.props;
+    const isRTL = i18n.language === 'ar';
+
     if (this.state.hasError) {
       return (
         <div style={{
@@ -35,12 +39,13 @@ export class ErrorBoundary extends Component<Props, State> {
           padding: '2rem',
           textAlign: 'center',
           fontFamily: 'system-ui, sans-serif',
+          direction: isRTL ? 'rtl' : 'ltr',
         }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: '#dc2626' }}>
-            Something went wrong
+            {t('error.somethingWentWrong')}
           </h1>
           <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
-            {this.state.error?.message || 'An unexpected error occurred'}
+            {this.state.error?.message || t('error.unexpectedError')}
           </p>
           <button
             onClick={() => {
@@ -57,11 +62,11 @@ export class ErrorBoundary extends Component<Props, State> {
               fontSize: '1rem',
             }}
           >
-            Reload Page
+            {t('error.reloadPage')}
           </button>
           {process.env.NODE_ENV === 'development' && this.state.error && (
-            <details style={{ marginTop: '2rem', textAlign: 'left', maxWidth: '800px' }}>
-              <summary style={{ cursor: 'pointer', color: '#6b7280' }}>Error Details</summary>
+            <details style={{ marginTop: '2rem', textAlign: isRTL ? 'right' : 'left', maxWidth: '800px' }}>
+              <summary style={{ cursor: 'pointer', color: '#6b7280' }}>{t('error.errorDetails')}</summary>
               <pre style={{
                 marginTop: '1rem',
                 padding: '1rem',
@@ -69,6 +74,8 @@ export class ErrorBoundary extends Component<Props, State> {
                 borderRadius: '0.5rem',
                 overflow: 'auto',
                 fontSize: '0.875rem',
+                direction: 'ltr', // Keep code in LTR
+                textAlign: 'left',
               }}>
                 {this.state.error.stack}
               </pre>
@@ -81,4 +88,6 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const ErrorBoundary = withTranslation()(ErrorBoundaryClass);
 
