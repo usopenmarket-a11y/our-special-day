@@ -21,6 +21,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    console.error('Error stack:', error.stack);
+    console.error('Component stack:', errorInfo.componentStack);
+    
+    // Also log to window for easier debugging
+    (window as any).__lastError = { error, errorInfo };
   }
 
   private handleReload = () => {
@@ -61,6 +66,8 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const translations = this.getTranslations();
       const isRTL = translations.isRTL;
+      const errorMessage = this.state.error?.message || translations.unexpectedError;
+      const errorStack = this.state.error?.stack || 'No stack trace available';
 
       return (
         <div style={{
@@ -73,12 +80,13 @@ export class ErrorBoundary extends Component<Props, State> {
           textAlign: 'center',
           fontFamily: 'system-ui, sans-serif',
           direction: isRTL ? 'rtl' : 'ltr',
+          backgroundColor: '#ffffff',
         }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '1rem', color: '#dc2626' }}>
             {translations.somethingWentWrong}
           </h1>
-          <p style={{ marginBottom: '1rem', color: '#6b7280' }}>
-            {this.state.error?.message || translations.unexpectedError}
+          <p style={{ marginBottom: '1rem', color: '#6b7280', maxWidth: '600px' }}>
+            {errorMessage}
           </p>
           <button
             onClick={this.handleReload}
@@ -90,27 +98,28 @@ export class ErrorBoundary extends Component<Props, State> {
               borderRadius: '0.5rem',
               cursor: 'pointer',
               fontSize: '1rem',
+              marginBottom: '1rem',
             }}
           >
             {translations.reloadPage}
           </button>
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <details style={{ marginTop: '2rem', textAlign: isRTL ? 'right' : 'left', maxWidth: '800px' }}>
-              <summary style={{ cursor: 'pointer', color: '#6b7280' }}>{translations.errorDetails}</summary>
-              <pre style={{
-                marginTop: '1rem',
-                padding: '1rem',
-                backgroundColor: '#f3f4f6',
-                borderRadius: '0.5rem',
-                overflow: 'auto',
-                fontSize: '0.875rem',
-                direction: 'ltr',
-                textAlign: 'left',
-              }}>
-                {this.state.error.stack}
-              </pre>
-            </details>
-          )}
+          {/* Always show error details in production for debugging */}
+          <details style={{ marginTop: '1rem', textAlign: isRTL ? 'right' : 'left', maxWidth: '800px', width: '100%' }}>
+            <summary style={{ cursor: 'pointer', color: '#6b7280', marginBottom: '1rem' }}>{translations.errorDetails}</summary>
+            <pre style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '0.5rem',
+              overflow: 'auto',
+              fontSize: '0.875rem',
+              direction: 'ltr',
+              textAlign: 'left',
+              maxHeight: '400px',
+            }}>
+              {errorStack}
+            </pre>
+          </details>
         </div>
       );
     }
