@@ -134,11 +134,16 @@ serve(async (req) => {
     if (attending === undefined) throw new Error('attending is required');
 
     console.log(`Saving RSVP for ${guests.length} guest(s), attending: ${attending}`);
+    guests.forEach((g, i) => {
+      console.log(`  Guest ${i + 1}: ${g.name} (rowIndex: ${g.rowIndex})`);
+    });
 
     const now = new Date();
     const date = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const confirmationText = attending ? 'Yes, Attending' : 'Regretfully Decline';
+    
+    console.log(`Confirmation: ${confirmationText}, Date: ${date}, Time: ${time}`);
 
     // Obtain service account token with Sheets scope
     const token = await getAccessToken('https://www.googleapis.com/auth/spreadsheets');
@@ -161,10 +166,11 @@ serve(async (req) => {
       // Column D: Date (updated)
       // Column E: Time (updated)
       const range = `Sheet1!C${actualRow}:E${actualRow}`;
-      updates.push({ 
-        range, 
-        values: [[confirmationText, date, time]] // [Confirmation, Date, Time]
-      });
+      const values = [[confirmationText, date, time]]; // [Confirmation, Date, Time]
+      
+      console.log(`Preparing update for ${guest.name}: Range=${range}, Values=${JSON.stringify(values)}`);
+      
+      updates.push({ range, values });
       guestNames.push(guest.name);
     }
 

@@ -44,10 +44,16 @@ const RSVPSection = () => {
 
         if (error) {
           console.error("Error fetching guests:", error);
+          setGuests([]);
           return;
         }
 
-        setGuests(data.guests || []);
+        const fetchedGuests = data?.guests || [];
+        console.log(`Fetched ${fetchedGuests.length} guests for query "${searchQuery}"`);
+        fetchedGuests.forEach((g: GuestInfo, i: number) => {
+          console.log(`  ${i + 1}. ${g.name} (Family: ${g.familyGroup || 'None'}, rowIndex: ${g.rowIndex})`);
+        });
+        setGuests(fetchedGuests);
       } catch (err) {
         console.error("Failed to fetch guests:", err);
       } finally {
@@ -107,13 +113,18 @@ const RSVPSection = () => {
     setIsSubmitting(true);
 
     try {
+      console.log(`Submitting RSVP for ${selectedGuests.length} guest(s):`, selectedGuests);
+      console.log(`Attendance: ${attendance}`);
+      
       // Save RSVP to Google Sheet for all selected guests
       const { data, error } = await supabase.functions.invoke('save-rsvp', {
         body: {
-          guests: selectedGuests,
+          guests: selectedGuests.map(g => ({ name: g.name, rowIndex: g.rowIndex })),
           attending: attendance === "attending",
         },
       });
+      
+      console.log('RSVP response:', { data, error });
 
       if (error || data?.success === false) {
         // Extract error message, prioritizing note (detailed error) if available

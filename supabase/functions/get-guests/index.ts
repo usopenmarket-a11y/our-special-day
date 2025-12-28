@@ -50,11 +50,16 @@ serve(async (req) => {
         const name = columns[0]?.replace(/"/g, '').trim(); // Column A: Name
         const familyGroup = columns[1]?.replace(/"/g, '').trim() || ''; // Column B: Family Group
         
+        // Debug: Log first few rows to verify parsing
+        if (i <= 15) {
+          console.log(`Row ${i}: Name="${name}", FamilyGroup="${familyGroup}", Columns=${columns.length}`);
+        }
+        
         if (name && name.length > 0) {
           guests.push({ 
             name, 
             rowIndex: i - 1, // rowIndex is 0-based (excluding header), used to write back to correct row
-            familyGroup: familyGroup || undefined
+            familyGroup: familyGroup && familyGroup.length > 0 ? familyGroup : undefined
           });
         }
       }
@@ -65,25 +70,39 @@ serve(async (req) => {
     // Filter by search query and include family members
     let filteredGuests = guests;
     if (searchQuery && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
       
       // First, find all guests matching the search query
       const matchingGuests = guests.filter(guest => 
         guest.name.toLowerCase().includes(query)
       );
       
-      // Collect all unique family groups from matching guests
+      console.log(`Search query: "${searchQuery}" - Found ${matchingGuests.length} matching guests`);
+      matchingGuests.forEach(g => {
+        console.log(`  - ${g.name} (Family: ${g.familyGroup || 'None'})`);
+      });
+      
+      // Collect all unique family groups from matching guests (case-sensitive exact match)
       const familyGroups = new Set<string>();
       matchingGuests.forEach(guest => {
-        if (guest.familyGroup) {
-          familyGroups.add(guest.familyGroup);
+        if (guest.familyGroup && guest.familyGroup.trim().length > 0) {
+          familyGroups.add(guest.familyGroup.trim());
         }
       });
       
-      // Find all guests in the same family groups
+      console.log(`Found ${familyGroups.size} unique family group(s):`, Array.from(familyGroups));
+      
+      // Find all guests in the same family groups (exact match, case-sensitive)
       const relatedGuests = guests.filter(guest => 
-        guest.familyGroup && familyGroups.has(guest.familyGroup)
+        guest.familyGroup && 
+        guest.familyGroup.trim().length > 0 &&
+        familyGroups.has(guest.familyGroup.trim())
       );
+      
+      console.log(`Found ${relatedGuests.length} related family members`);
+      relatedGuests.forEach(g => {
+        console.log(`  - ${g.name} (Family: ${g.familyGroup})`);
+      });
       
       // Combine matching guests and related family members, remove duplicates
       // Use rowIndex as key to handle cases where multiple guests might have the same name
@@ -101,7 +120,7 @@ serve(async (req) => {
       
       filteredGuests = Array.from(allRelatedGuests.values());
       
-      console.log(`Found ${matchingGuests.length} matching guests and ${filteredGuests.length} total (including family)`);
+      console.log(`Total guests to return: ${filteredGuests.length} (${matchingGuests.length} matching + ${relatedGuests.length} family members)`);
     }
     
     return new Response(
@@ -125,6 +144,7 @@ serve(async (req) => {
 });
 
 // Helper function to parse CSV line (handles quoted values with commas)
+// Google Sheets CSV format: values may be quoted, empty cells are just commas
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
@@ -134,7 +154,13 @@ function parseCSVLine(line: string): string[] {
     const char = line[i];
     
     if (char === '"') {
-      inQuotes = !inQuotes;
+      // Handle escaped quotes ("")
+      if (i + 1 < line.length && line[i + 1] === '"' && inQuotes) {
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
     } else if (char === ',' && !inQuotes) {
       result.push(current);
       current = '';
@@ -143,6 +169,14 @@ function parseCSVLine(line: string): string[] {
     }
   }
   
+  // Push the last column
   result.push(current);
+  
+  // Ensure we have at least 2 columns (Name and Family Group)
+  // If Family Group is missing, add empty string
+  while (result.length < 2) {
+    result.push('');
+  }
+  
   return result;
 }
