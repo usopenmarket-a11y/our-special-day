@@ -119,9 +119,7 @@ const Navigation = () => {
                     {item.label}
                   </motion.button>
                 ))}
-                <div className="pt-4">
-                  <LanguageSwitcher />
-                </div>
+                {/* Language switcher removed from mobile menu - now visible on home page */}
               </div>
             </div>
           </motion.div>

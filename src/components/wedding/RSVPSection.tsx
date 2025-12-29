@@ -343,7 +343,6 @@ const RSVPSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 md:gap-2">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
                     <Input
                       type="text"
                       placeholder={t("rsvp.searchPlaceholder")}
@@ -355,7 +354,7 @@ const RSVPSection = () => {
                           handleSearch();
                         }
                       }}
-                      className="font-body pl-10 md:pl-12 h-11 md:h-12 text-base px-3 sm:px-4"
+                      className="font-body h-11 md:h-12 text-base px-3 sm:px-4"
                       disabled={!canSearch()}
                     />
                   </div>

@@ -3,6 +3,7 @@ import CountdownTimer from "./CountdownTimer";
 import { weddingConfig } from "@/lib/weddingConfig";
 import { Heart } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "./LanguageSwitcher";
 
 const HeroSection = () => {
   const { t, i18n } = useTranslation();
@@ -16,6 +17,18 @@ const HeroSection = () => {
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-20 md:py-24 overflow-hidden gradient-hero">
+      {/* Language Switcher - Mobile Only (visible on home page) */}
+      <div className="fixed top-20 right-4 z-50 md:hidden">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="bg-background/80 backdrop-blur-sm border border-gold/20 rounded-full shadow-lg p-1"
+        >
+          <LanguageSwitcher />
+        </motion.div>
+      </div>
+
       {/* Decorative elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 left-10 w-32 h-32 bg-rose/20 rounded-full blur-3xl animate-float" />

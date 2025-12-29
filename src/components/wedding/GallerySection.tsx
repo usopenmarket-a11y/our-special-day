@@ -31,6 +31,7 @@ const GallerySection = () => {
   const [errorType, setErrorType] = useState<'config' | 'api' | 'fetch' | null>(null);
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
+  const [imagesLoaded, setImagesLoaded] = useState<Set<string>>(new Set());
   const isRTL = i18n.language === 'ar';
 
   // Get translated error message based on error type - recompute when language changes
@@ -71,6 +72,7 @@ const GallerySection = () => {
       try {
         setLoading(true);
         setErrorType(null);
+        setImagesLoaded(new Set()); // Reset loaded images when fetching new data
         const { data, error } = await supabase.functions.invoke('get-gallery', {
           body: { folderId: config.galleryFolderId }
         });
@@ -104,7 +106,7 @@ const GallerySection = () => {
     };
 
     fetchGallery();
-  }, [config, configLoading, i18n.language]);
+  }, [config, configLoading]); // Removed i18n.language dependency - don't refetch on language change
 
   useEffect(() => {
     if (!api) {
@@ -118,20 +120,42 @@ const GallerySection = () => {
     });
   }, [api]);
 
+  // Reset images loaded state when language changes to force reload
+  useEffect(() => {
+    setImagesLoaded(new Set());
+  }, [isRTL]);
+
   // Reinitialize carousel when RTL changes to ensure proper rendering
   useEffect(() => {
     if (api && images.length > 0) {
-      // Small delay to ensure DOM is updated with new direction
+      // Longer delay to ensure DOM is fully updated with new direction and images are rendered
       const timer = setTimeout(() => {
         try {
           api.reInit();
+          // Force carousel to update after reinit
+          api.scrollTo(0, true); // Jump to first slide without animation
+          // Trigger a small scroll to ensure images in viewport start loading
+          setTimeout(() => {
+            api.scrollTo(0, false);
+          }, 100);
         } catch (error) {
           console.error('Error reinitializing carousel:', error);
         }
-      }, 200);
+      }, 800); // Increased delay to allow DOM and images to fully render
       return () => clearTimeout(timer);
     }
   }, [isRTL, api, images.length]);
+
+  // Handle image load events
+  const handleImageLoad = (imageId: string) => {
+    setImagesLoaded(prev => new Set(prev).add(imageId));
+  };
+
+  const handleImageError = (imageId: string, imageUrl: string) => {
+    console.error(`Failed to load image ${imageId}:`, imageUrl);
+    // Optionally, you could remove the failed image from the list
+    // or show a placeholder
+  };
 
 
 
@@ -221,32 +245,42 @@ const GallerySection = () => {
         {!loading && images.length > 0 && (
           <div className="relative w-full" dir={isRTL ? 'rtl' : 'ltr'}>
             <Carousel
-              key={`carousel-${isRTL ? 'rtl' : 'ltr'}-${images.length}`}
+              key={`carousel-${isRTL ? 'rtl' : 'ltr'}-${images.length}-${imagesLoaded.size}`}
               setApi={setApi}
               opts={{
                 align: "center",
                 loop: true,
+                direction: isRTL ? 'rtl' : 'ltr',
               }}
               plugins={[autoplay.current]}
               className="w-full"
             >
               <CarouselContent className={isRTL ? "-mr-2 md:-mr-4" : "-ml-2 md:-ml-4"}>
                 {images.map((image, index) => (
-                  <CarouselItem key={image.id} className={isRTL ? "pr-2 md:pr-4 md:basis-1/2 lg:basis-1/3" : "pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3"}>
+                  <CarouselItem key={`${image.id}-${isRTL ? 'rtl' : 'ltr'}`} className={isRTL ? "pr-2 md:pr-4 md:basis-1/2 lg:basis-1/3" : "pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3"}>
                     <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}
                       whileInView={{ opacity: 1, scale: 1 }}
-                      viewport={{ once: true }}
+                      viewport={{ once: false }} // Changed to false to re-animate on language change
                       transition={{ duration: 0.5, delay: index * 0.1 }}
                       className="relative group"
                     >
                       <div className="relative overflow-hidden rounded-xl shadow-soft border border-gold/10 aspect-square md:aspect-[4/5]">
                         <img
+                          key={`${image.id}-${isRTL ? 'rtl' : 'ltr'}`} // Force remount on language change
                           src={image.url}
-                          alt=""
+                          alt={image.alt || `Gallery image ${index + 1}`}
                           className="w-full h-full object-cover"
-                          loading="lazy"
+                          loading={index < 3 ? "eager" : "lazy"} // Load first 3 images eagerly
+                          onLoad={() => handleImageLoad(image.id)}
+                          onError={() => handleImageError(image.id, image.url)}
+                          decoding="async"
                         />
+                        {!imagesLoaded.has(image.id) && (
+                          <div className="absolute inset-0 bg-muted animate-pulse flex items-center justify-center">
+                            <Loader2 className="w-8 h-8 text-gold/50 animate-spin" />
+                          </div>
+                        )}
                       </div>
                     </motion.div>
                   </CarouselItem>
