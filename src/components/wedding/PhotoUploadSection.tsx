@@ -170,13 +170,23 @@ const PhotoUploadSection = () => {
           continue;
         }
 
-        // Validate file size again (client-side check)
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        // Validate file size again (client-side check) - different limits for images vs videos
+        const isVideo = isVideoFile(uploadFile.file);
+        const maxSize = isVideo 
+          ? 100 * 1024 * 1024  // 100MB for videos
+          : 10 * 1024 * 1024;  // 10MB for images
+        
         if (uploadFile.file.size > maxSize) {
           const fileSizeMB = (uploadFile.file.size / (1024 * 1024)).toFixed(2);
+          const maxSizeMB = isVideo ? 100 : 10;
           toast({
             title: t("upload.fileTooLarge"),
-            description: `${uploadFile.file.name}: ${fileSizeMB}MB exceeds 10MB limit`,
+            description: t("upload.fileTooLargeMessage", { 
+              fileName: uploadFile.file.name, 
+              fileSize: fileSizeMB,
+              maxSize: maxSizeMB,
+              fileType: isVideo ? t("upload.video") : t("upload.image")
+            }),
             variant: "destructive",
           });
           setFiles((prev) =>
@@ -189,24 +199,47 @@ const PhotoUploadSection = () => {
         }
 
         const fileSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
-        console.log(`Uploading: ${uploadFile.file.name} (${fileSizeMB}MB, type: ${uploadFile.file.type})`);
+        const isVideo = isVideoFile(uploadFile.file);
+        console.log(`Uploading: ${uploadFile.file.name} (${fileSizeMB}MB, type: ${uploadFile.file.type}, ${isVideo ? 'video' : 'image'})`);
 
         // Read file as base64
         // Use FileReader API for better handling of large files
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (typeof reader.result === 'string') {
-              // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
-              const base64String = reader.result.split(',')[1] || reader.result;
-              resolve(base64String);
-            } else {
-              reject(new Error('Failed to read file as base64'));
-            }
-          };
-          reader.onerror = () => reject(new Error('File reading failed'));
-          reader.readAsDataURL(uploadFile.file);
-        });
+        let base64: string;
+        try {
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result === 'string') {
+                // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
+                const base64String = reader.result.split(',')[1] || reader.result;
+                console.log(`Base64 encoding complete for ${uploadFile.file.name} (base64 length: ${base64String.length})`);
+                resolve(base64String);
+              } else {
+                reject(new Error('Failed to read file as base64'));
+              }
+            };
+            reader.onerror = (e) => {
+              console.error(`FileReader error for ${uploadFile.file.name}:`, e);
+              reject(new Error(`File reading failed: ${e.type || 'unknown error'}`));
+            };
+            reader.readAsDataURL(uploadFile.file);
+          });
+        } catch (base64Error) {
+          console.error(`Base64 encoding failed for ${uploadFile.file.name}:`, base64Error);
+          const errorMsg = base64Error instanceof Error ? base64Error.message : 'Failed to encode file';
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+          errorCount++;
+          toast({
+            title: t("upload.uploadFailed"),
+            description: `${uploadFile.file.name}: ${errorMsg}`,
+            variant: "destructive",
+          });
+          continue;
+        }
 
         const payload = {
           fileName: uploadFile.file.name,
@@ -219,12 +252,38 @@ const PhotoUploadSection = () => {
           body: payload,
         });
 
-        // Check for errors first
+        // Check for errors - when Edge Function returns non-2xx, error is set but data may contain error details
         if (error) {
           console.error("Upload error for", uploadFile.file.name, ":", error);
-          const errorMessage = error.message || 
-            (typeof error === 'string' ? error : JSON.stringify(error)) ||
-            t("upload.errorMessage");
+          console.error("Error data:", data);
+          
+          // Try to extract detailed error message from data first (Edge Function returns error in response body)
+          let errorMessage = t("upload.errorMessage");
+          
+          // Priority 1: Check if data contains error details (Edge Function returns { success: false, error: "..." })
+          if (data && typeof data === 'object') {
+            const dataError = (data as any).error || (data as any).message;
+            if (dataError) {
+              errorMessage = typeof dataError === 'string' ? dataError : JSON.stringify(dataError);
+            }
+          }
+          
+          // Priority 2: Check if error has a message property
+          if (errorMessage === t("upload.errorMessage") && error.message) {
+            errorMessage = error.message;
+          } 
+          // Priority 3: Check if error is a string
+          else if (errorMessage === t("upload.errorMessage") && typeof error === 'string') {
+            errorMessage = error;
+          }
+          // Priority 4: Try to extract from error object
+          else if (errorMessage === t("upload.errorMessage") && typeof error === 'object') {
+            const errorStr = JSON.stringify(error);
+            // Only use if it's not the generic "non-2xx" message
+            if (!errorStr.includes('non-2xx') && errorStr.length < 200) {
+              errorMessage = errorStr;
+            }
+          }
           
           setFiles((prev) =>
             prev.map((f) =>
