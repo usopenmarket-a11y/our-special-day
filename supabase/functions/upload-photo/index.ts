@@ -205,7 +205,40 @@ serve(async (req) => {
     const delimiter = `\r\n--${boundary}\r\n`;
     const closeDelimiter = `\r\n--${boundary}--`;
 
-    const base64Data = btoa(String.fromCharCode(...fileBuffer));
+    // Convert fileBuffer to base64 efficiently
+    // For large files, process in chunks to avoid memory issues
+    let base64Data: string;
+    try {
+      const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
+      console.log(`Encoding file to base64 (${fileSizeMB}MB)...`);
+      
+      // For files larger than 5MB, use chunked encoding
+      if (fileBuffer.length > 5 * 1024 * 1024) {
+        console.log('Using chunked base64 encoding for large file');
+        const chunkSize = 8192; // 8KB chunks
+        let binaryString = '';
+        
+        for (let i = 0; i < fileBuffer.length; i += chunkSize) {
+          const chunk = fileBuffer.slice(i, Math.min(i + chunkSize, fileBuffer.length));
+          // Build binary string chunk by chunk
+          for (let j = 0; j < chunk.length; j++) {
+            binaryString += String.fromCharCode(chunk[j]);
+          }
+        }
+        
+        base64Data = btoa(binaryString);
+      } else {
+        // For smaller files, use the standard method
+        base64Data = btoa(String.fromCharCode(...fileBuffer));
+      }
+      
+      console.log(`Base64 encoding complete (${(base64Data.length / 1024 / 1024).toFixed(2)}MB)`);
+    } catch (base64Error) {
+      console.error('Base64 encoding error:', base64Error);
+      const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
+      throw new Error(`Failed to encode file to base64: ${base64Error instanceof Error ? base64Error.message : 'Unknown error'}. File size: ${fileSizeMB}MB. This may indicate the file is too large or corrupted.`);
+    }
+    
     const multipartRequestBody =
       delimiter +
       'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
@@ -382,6 +415,26 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error uploading photo:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(JSON.stringify({ success: false, error: errorMessage }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    
+    // Add more context to error messages for better debugging
+    let detailedError = errorMessage;
+    if (error instanceof Error) {
+      // Check for specific error types and provide helpful messages
+      if (errorMessage.includes('base64') || errorMessage.includes('encode')) {
+        detailedError = `File encoding failed: ${errorMessage}. The file may be too large or corrupted.`;
+      } else if (errorMessage.includes('folderId') || errorMessage.includes('folder')) {
+        detailedError = `Upload folder not configured: ${errorMessage}. Please check UPLOAD_FOLDER_ID environment variable.`;
+      } else if (errorMessage.includes('Token') || errorMessage.includes('authentication') || errorMessage.includes('OAuth')) {
+        detailedError = `Authentication failed: ${errorMessage}. Please check your Google credentials (GOOGLE_SERVICE_ACCOUNT or OAuth tokens).`;
+      } else if (errorMessage.includes('quota') || errorMessage.includes('storage') || errorMessage.includes('Service Accounts')) {
+        detailedError = `Storage quota issue: ${errorMessage}. Service accounts cannot upload to regular Drive folders. Please set up OAuth credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN).`;
+      } else if (errorMessage.includes('Drive upload failed')) {
+        // Keep the detailed Drive API error
+        detailedError = errorMessage;
+      }
+    }
+    
+    console.error('Returning detailed error message:', detailedError);
+    return new Response(JSON.stringify({ success: false, error: detailedError }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
