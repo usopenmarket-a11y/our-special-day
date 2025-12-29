@@ -22,9 +22,50 @@ const PhotoUploadSection = () => {
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
 
+  // Allowed file types
+  const allowedImageTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/heic',
+    'image/heif',
+    'video/mp4',
+    'video/mpeg',
+    'video/quicktime',
+    'video/x-msvideo', // AVI
+    'video/webm',
+  ];
+
+  // Allowed file extensions (for files that might not have proper MIME type)
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.mp4', '.mov', '.avi', '.webm'];
+
+  const isValidFileType = (file: File): boolean => {
+    // Check MIME type
+    if (allowedImageTypes.includes(file.type.toLowerCase())) {
+      return true;
+    }
+    
+    // Check file extension as fallback (for files with incorrect MIME types)
+    const fileName = file.name.toLowerCase();
+    return allowedExtensions.some(ext => fileName.endsWith(ext));
+  };
+
+  const isVideoFile = (file: File): boolean => {
+    // Check MIME type
+    if (file.type.startsWith('video/')) {
+      return true;
+    }
+    
+    // Check file extension as fallback
+    const fileName = file.name.toLowerCase();
+    return ['.mp4', '.mov', '.avi', '.webm'].some(ext => fileName.endsWith(ext));
+  };
+
   const handleFiles = useCallback((fileList: FileList) => {
     const validFiles = Array.from(fileList).filter((file) => {
-      if (!file.type.startsWith("image/")) {
+      // Check file type - accept JPEG, PNG, GIF, HEIC, and video files
+      if (!isValidFileType(file)) {
         toast({
           title: t("upload.invalidFile"),
           description: t("upload.invalidFileMessage", { fileName: file.name }),
@@ -32,14 +73,30 @@ const PhotoUploadSection = () => {
         });
         return false;
       }
-      if (file.size > 10 * 1024 * 1024) {
+      
+      // Check file size - different limits for images vs videos
+      const isVideo = isVideoFile(file);
+      const maxSize = isVideo 
+        ? 100 * 1024 * 1024  // 100MB for videos
+        : 10 * 1024 * 1024;   // 10MB for images
+      
+      if (file.size > maxSize) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        const maxSizeMB = isVideo ? 100 : 10;
         toast({
           title: t("upload.fileTooLarge"),
-          description: t("upload.fileTooLargeMessage", { fileName: file.name }),
+          description: t("upload.fileTooLargeMessage", { 
+            fileName: file.name, 
+            fileSize: fileSizeMB,
+            maxSize: maxSizeMB,
+            fileType: isVideo ? t("upload.video") : t("upload.image")
+          }),
           variant: "destructive",
         });
         return false;
       }
+      
+      // No dimension restrictions - accept any image/video dimensions
       return true;
     });
 
@@ -97,13 +154,7 @@ const PhotoUploadSection = () => {
     // Upload each file
     for (const uploadFile of pending) {
       try {
-        // Read file as base64 and send JSON payload so supabase.functions.invoke works
-        const arrayBuffer = await uploadFile.file.arrayBuffer();
-        const uint8 = new Uint8Array(arrayBuffer);
-        let binary = "";
-        for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-        const base64 = btoa(binary);
-
+        // Validate file before processing
         if (!config?.uploadFolderId) {
           toast({
             title: t("upload.uploadUnavailable"),
@@ -115,8 +166,47 @@ const PhotoUploadSection = () => {
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
+          errorCount++;
           continue;
         }
+
+        // Validate file size again (client-side check)
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (uploadFile.file.size > maxSize) {
+          const fileSizeMB = (uploadFile.file.size / (1024 * 1024)).toFixed(2);
+          toast({
+            title: t("upload.fileTooLarge"),
+            description: `${uploadFile.file.name}: ${fileSizeMB}MB exceeds 10MB limit`,
+            variant: "destructive",
+          });
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+            )
+          );
+          errorCount++;
+          continue;
+        }
+
+        const fileSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
+        console.log(`Uploading: ${uploadFile.file.name} (${fileSizeMB}MB, type: ${uploadFile.file.type})`);
+
+        // Read file as base64
+        // Use FileReader API for better handling of large files
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
+              const base64String = reader.result.split(',')[1] || reader.result;
+              resolve(base64String);
+            } else {
+              reject(new Error('Failed to read file as base64'));
+            }
+          };
+          reader.onerror = () => reject(new Error('File reading failed'));
+          reader.readAsDataURL(uploadFile.file);
+        });
 
         const payload = {
           fileName: uploadFile.file.name,
@@ -131,15 +221,20 @@ const PhotoUploadSection = () => {
 
         // Check for errors first
         if (error) {
-          console.error("Upload error:", error);
+          console.error("Upload error for", uploadFile.file.name, ":", error);
+          const errorMessage = error.message || 
+            (typeof error === 'string' ? error : JSON.stringify(error)) ||
+            t("upload.errorMessage");
+          
           setFiles((prev) =>
             prev.map((f) =>
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
+          errorCount++;
           toast({
             title: t("upload.uploadFailed"),
-            description: error.message || t("upload.errorMessage"),
+            description: `${uploadFile.file.name}: ${errorMessage}`,
             variant: "destructive",
           });
           continue;
@@ -156,16 +251,18 @@ const PhotoUploadSection = () => {
         if (!isSuccess) {
           const errorMsg = responseData?.error || 
                           (responseData?.success === false ? responseData.error : undefined) ||
+                          responseData?.message ||
                           "Upload failed - no file ID returned";
-          console.error("Upload failed - invalid response:", responseData);
+          console.error("Upload failed for", uploadFile.file.name, "- invalid response:", responseData);
           setFiles((prev) =>
             prev.map((f) =>
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
+          errorCount++;
           toast({
             title: t("upload.uploadFailed"),
-            description: errorMsg,
+            description: `${uploadFile.file.name}: ${errorMsg}`,
             variant: "destructive",
           });
           continue;
@@ -180,7 +277,11 @@ const PhotoUploadSection = () => {
         );
         successCount++;
       } catch (err) {
-        console.error("Upload failed:", err);
+        console.error("Upload failed for", uploadFile.file.name, ":", err);
+        const errorMessage = err instanceof Error 
+          ? err.message 
+          : (typeof err === 'string' ? err : JSON.stringify(err)) || t("upload.errorMessage");
+        
         setFiles((prev) =>
           prev.map((f) =>
             f.id === uploadFile.id ? { ...f, status: "error" as const } : f
@@ -189,7 +290,7 @@ const PhotoUploadSection = () => {
         errorCount++;
         toast({
           title: t("upload.error"),
-          description: err instanceof Error ? err.message : t("upload.errorMessage"),
+          description: `${uploadFile.file.name}: ${errorMessage}`,
           variant: "destructive",
         });
       }
@@ -281,7 +382,7 @@ const PhotoUploadSection = () => {
             >
               <input
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/heic,image/heif,video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm,.jpg,.jpeg,.png,.gif,.heic,.heif,.mp4,.mov,.avi,.webm"
                 multiple
                 onChange={(e) => e.target.files && handleFiles(e.target.files)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-manipulation"
@@ -331,16 +432,28 @@ const PhotoUploadSection = () => {
                 </div>
 
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
-                  {files.map((uploadFile) => (
+                  {files.map((uploadFile) => {
+                    const isVideo = isVideoFile(uploadFile.file);
+                    
+                    return (
                     <div
                       key={uploadFile.id}
                       className="relative aspect-square rounded-lg overflow-hidden group"
                     >
-                      <img
-                        src={uploadFile.preview}
-                        alt="Upload preview"
-                        className="w-full h-full object-cover"
-                      />
+                      {isVideo ? (
+                        <video
+                          src={uploadFile.preview}
+                          className="w-full h-full object-cover"
+                          muted
+                          playsInline
+                        />
+                      ) : (
+                        <img
+                          src={uploadFile.preview}
+                          alt="Upload preview"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
 
                       {/* Status Overlay */}
                       <div
@@ -373,7 +486,8 @@ const PhotoUploadSection = () => {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             )}
