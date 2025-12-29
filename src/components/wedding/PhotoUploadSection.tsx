@@ -247,42 +247,95 @@ const PhotoUploadSection = () => {
           folderId: config.uploadFolderId,
         };
 
-        const { data, error } = await supabase.functions.invoke("upload-photo", {
-          body: payload,
-        });
+        let responseData: any;
+        let errorMessage = t("upload.errorMessage");
+        
+        try {
+          const { data, error } = await supabase.functions.invoke("upload-photo", {
+            body: payload,
+          });
 
-        // Check for errors - when Edge Function returns non-2xx, error is set but data may contain error details
-        if (error) {
-          console.error("Upload error for", uploadFile.file.name, ":", error);
-          console.error("Error data:", data);
-          
-          // Try to extract detailed error message from data first (Edge Function returns error in response body)
-          let errorMessage = t("upload.errorMessage");
-          
-          // Priority 1: Check if data contains error details (Edge Function returns { success: false, error: "..." })
-          if (data && typeof data === 'object') {
-            const dataError = (data as any).error || (data as any).message;
-            if (dataError) {
-              errorMessage = typeof dataError === 'string' ? dataError : JSON.stringify(dataError);
+          // Check for errors - when Edge Function returns non-2xx, error is set but data may contain error details
+          if (error) {
+            console.error("Upload error for", uploadFile.file.name, ":", error);
+            console.error("Error object:", JSON.stringify(error, null, 2));
+            console.error("Error data:", data);
+            console.error("Error message:", error.message);
+            console.error("Error context:", error.context);
+            
+            // Priority 1: Check if data contains error details (Edge Function returns { success: false, error: "..." })
+            // Supabase may still parse the response body into data even when error is set
+            if (data && typeof data === 'object') {
+              const dataError = (data as any).error || (data as any).message || (data as any).reason;
+              if (dataError) {
+                errorMessage = typeof dataError === 'string' ? dataError : JSON.stringify(dataError);
+                console.log("Extracted error from data:", errorMessage);
+              }
             }
-          }
-          
-          // Priority 2: Check if error has a message property
-          if (errorMessage === t("upload.errorMessage") && error.message) {
-            errorMessage = error.message;
-          } 
-          // Priority 3: Check if error is a string
-          else if (errorMessage === t("upload.errorMessage") && typeof error === 'string') {
-            errorMessage = error;
-          }
-          // Priority 4: Try to extract from error object
-          else if (errorMessage === t("upload.errorMessage") && typeof error === 'object') {
-            const errorStr = JSON.stringify(error);
-            // Only use if it's not the generic "non-2xx" message
-            if (!errorStr.includes('non-2xx') && errorStr.length < 200) {
-              errorMessage = errorStr;
+            
+            // Priority 2: Check error.context (Supabase sometimes puts response body here)
+            if (errorMessage === t("upload.errorMessage") && error.context) {
+              try {
+                const contextError = typeof error.context === 'string' 
+                  ? JSON.parse(error.context) 
+                  : error.context;
+                if (contextError?.error || contextError?.message) {
+                  errorMessage = contextError.error || contextError.message;
+                  console.log("Extracted error from context:", errorMessage);
+                }
+              } catch (e) {
+                // Context is not JSON, try as string
+                if (typeof error.context === 'string' && error.context.length < 500) {
+                  errorMessage = error.context;
+                  console.log("Using context as error message:", errorMessage);
+                }
+              }
             }
+            
+            // Priority 3: Check if error has a message property
+            if (errorMessage === t("upload.errorMessage") && error.message) {
+              // Only use if it's not the generic "non-2xx" message
+              if (!error.message.includes('non-2xx') || data) {
+                errorMessage = error.message;
+                console.log("Using error.message:", errorMessage);
+              }
+            } 
+            // Priority 4: Check if error is a string
+            else if (errorMessage === t("upload.errorMessage") && typeof error === 'string') {
+              errorMessage = error;
+              console.log("Using error as string:", errorMessage);
+            }
+            // Priority 5: Try to extract from error object
+            else if (errorMessage === t("upload.errorMessage") && typeof error === 'object') {
+              const errorStr = JSON.stringify(error);
+              // Only use if it's not the generic "non-2xx" message and has useful info
+              if (!errorStr.includes('non-2xx') && errorStr.length < 500) {
+                errorMessage = errorStr;
+                console.log("Using stringified error:", errorMessage);
+              }
+            }
+            
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+              )
+            );
+            errorCount++;
+            toast({
+              title: t("upload.uploadFailed"),
+              description: `${uploadFile.file.name}: ${errorMessage}`,
+              variant: "destructive",
+            });
+            continue;
           }
+
+          responseData = data;
+        } catch (invokeError) {
+          // Catch any errors from the invoke itself
+          console.error("Invoke error for", uploadFile.file.name, ":", invokeError);
+          errorMessage = invokeError instanceof Error 
+            ? invokeError.message 
+            : (typeof invokeError === 'string' ? invokeError : JSON.stringify(invokeError)) || t("upload.errorMessage");
           
           setFiles((prev) =>
             prev.map((f) =>
@@ -299,7 +352,6 @@ const PhotoUploadSection = () => {
         }
 
         // Check response data - must have success: true AND an id
-        const responseData = data as any;
         const isSuccess = 
           responseData && 
           typeof responseData === "object" && 
