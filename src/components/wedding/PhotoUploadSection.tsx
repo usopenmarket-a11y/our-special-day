@@ -199,7 +199,6 @@ const PhotoUploadSection = () => {
         }
 
         const fileSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
-        const isVideo = isVideoFile(uploadFile.file);
         console.log(`Uploading: ${uploadFile.file.name} (${fileSizeMB}MB, type: ${uploadFile.file.type}, ${isVideo ? 'video' : 'image'})`);
 
         // Read file as base64
