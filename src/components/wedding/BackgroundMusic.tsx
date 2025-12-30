@@ -3,6 +3,7 @@ import { Volume2, VolumeX, AlertCircle, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { toArabicNumerals } from "@/lib/arabicNumbers";
 
 interface BackgroundMusicProps {
   src: string | string[]; // Support both single URL and playlist
