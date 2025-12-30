@@ -76,7 +76,7 @@
     "title": "Upload Your Photos",
     "subtitle": "Help us capture every moment by sharing your photos from the celebration",
     "dragDrop": "Drag & drop your photos here",
-    "orClick": "or click to browse • Images: 10MB max • Videos: 100MB max",
+    "orClick": "or click to browse • Images: 50MB max • Videos: 500MB max",
     "selectPhotos": "Select Photos",
     "uploading": "Uploading...",
     "upload": "Upload Photos",

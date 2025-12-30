@@ -41,19 +41,21 @@ const PhotoUploadSection = () => {
   const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.heic', '.heif', '.mp4', '.mov', '.avi', '.webm'];
 
   const isValidFileType = (file: File): boolean => {
-    // Check MIME type
-    if (allowedImageTypes.includes(file.type.toLowerCase())) {
+    // Check MIME type (handle empty MIME types from some devices)
+    const mimeType = file.type?.toLowerCase() || '';
+    if (mimeType && allowedImageTypes.includes(mimeType)) {
       return true;
     }
     
-    // Check file extension as fallback (for files with incorrect MIME types)
+    // Check file extension as fallback (for files with incorrect or missing MIME types)
     const fileName = file.name.toLowerCase();
     return allowedExtensions.some(ext => fileName.endsWith(ext));
   };
 
   const isVideoFile = (file: File): boolean => {
-    // Check MIME type
-    if (file.type.startsWith('video/')) {
+    // Check MIME type (handle empty MIME types from some devices)
+    const mimeType = file.type || '';
+    if (mimeType && mimeType.startsWith('video/')) {
       return true;
     }
     
@@ -66,6 +68,11 @@ const PhotoUploadSection = () => {
     const validFiles = Array.from(fileList).filter((file) => {
       // Check file type - accept JPEG, PNG, GIF, HEIC, and video files
       if (!isValidFileType(file)) {
+        console.warn(`File rejected: ${file.name}`, {
+          type: file.type || '(empty)',
+          size: file.size,
+          extension: file.name.split('.').pop()?.toLowerCase()
+        });
         toast({
           title: t("upload.invalidFile"),
           description: t("upload.invalidFileMessage", { fileName: file.name }),
@@ -77,12 +84,12 @@ const PhotoUploadSection = () => {
       // Check file size - different limits for images vs videos
       const isVideo = isVideoFile(file);
       const maxSize = isVideo 
-        ? 100 * 1024 * 1024  // 100MB for videos
-        : 10 * 1024 * 1024;   // 10MB for images
+        ? 500 * 1024 * 1024  // 500MB for videos
+        : 50 * 1024 * 1024;   // 50MB for images
       
       if (file.size > maxSize) {
         const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-        const maxSizeMB = isVideo ? 100 : 10;
+        const maxSizeMB = isVideo ? 500 : 50;
         toast({
           title: t("upload.fileTooLarge"),
           description: t("upload.fileTooLargeMessage", { 
@@ -173,12 +180,12 @@ const PhotoUploadSection = () => {
         // Validate file size again (client-side check) - different limits for images vs videos
         const isVideo = isVideoFile(uploadFile.file);
         const maxSize = isVideo 
-          ? 100 * 1024 * 1024  // 100MB for videos
-          : 10 * 1024 * 1024;  // 10MB for images
+          ? 500 * 1024 * 1024  // 500MB for videos
+          : 50 * 1024 * 1024;  // 50MB for images
         
         if (uploadFile.file.size > maxSize) {
           const fileSizeMB = (uploadFile.file.size / (1024 * 1024)).toFixed(2);
-          const maxSizeMB = isVideo ? 100 : 10;
+          const maxSizeMB = isVideo ? 500 : 50;
           toast({
             title: t("upload.fileTooLarge"),
             description: t("upload.fileTooLargeMessage", { 
@@ -492,7 +499,7 @@ const PhotoUploadSection = () => {
             >
               <input
                 type="file"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/heic,image/heif,video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm,.jpg,.jpeg,.png,.gif,.heic,.heif,.mp4,.mov,.avi,.webm"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/heic,image/heif,video/mp4,video/mpeg,video/quicktime,video/x-msvideo,video/webm,.jpg,.jpeg,.png,.gif,.heic,.heif,.mp4,.mov,.MOV,.avi,.webm"
                 multiple
                 onChange={(e) => e.target.files && handleFiles(e.target.files)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer touch-manipulation"
