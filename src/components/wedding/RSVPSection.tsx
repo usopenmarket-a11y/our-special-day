@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Check, Heart, X, Loader2, Search, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTranslation } from "react-i18next";
+import { toArabicNumerals } from "@/lib/arabicNumbers";
 
 interface GuestInfo {
   name: string;
@@ -53,7 +54,8 @@ const getRemainingSearches = (): number => {
 };
 
 const RSVPSection = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [selectedGuests, setSelectedGuests] = useState<GuestInfo[]>([]);
   const [attendance, setAttendance] = useState<"attending" | "not-attending" | "">("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -343,7 +345,7 @@ const RSVPSection = () => {
                   <Label className="text-sm md:text-base font-display">{t("rsvp.selectName")}</Label>
                   {searchCount > 0 && (
                     <span className="text-xs text-muted-foreground font-body">
-                      {t("rsvp.searchesRemaining", { count: getRemainingSearches() })}
+                      {t("rsvp.searchesRemaining", { count: toArabicNumerals(getRemainingSearches(), isArabic) })}
                     </span>
                   )}
                 </div>
@@ -498,7 +500,7 @@ const RSVPSection = () => {
                     <div className="flex items-center gap-2 mb-2">
                       <Heart className="w-4 h-4 md:w-5 md:h-5 text-gold" />
                       <span className="font-body text-sm md:text-base font-semibold text-foreground">
-                        {t("rsvp.selectedGuests")} ({selectedGuests.length})
+                        {t("rsvp.selectedGuests")} ({toArabicNumerals(selectedGuests.length, isArabic)})
                       </span>
                     </div>
                     <div className="flex flex-wrap gap-2">

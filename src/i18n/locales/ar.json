@@ -7,7 +7,7 @@
     "sharePhotos": "شارك الصور"
   },
   "hero": {
-    "togetherWithFamilies": "مع عائلاتهم",
+    "togetherWithFamilies": "",
     "invitation": "يشرفنا أن ندعوكم للاحتفال معنا",
     "countingDown": "العد التنازلي ليومنا المميز",
     "bride": "فادى",
@@ -35,7 +35,7 @@
     "success": "شكراً لك!",
     "successMessage": "تم استلام تأكيد حضورك. لا يمكننا الانتظار للاحتفال معك!",
     "attendingMessage": "لا يمكننا الانتظار للاحتفال معك!",
-    "notAttendingMessage": "نأسف لأنك لن تتمكن من الحضور. شكراً لإعلامنا!",
+    "notAttendingMessage": "كنا نتمنى وجودك معنا. شكراً لإعلامنا!",
     "error": "فشل حفظ التأكيد",
     "errorMessage": "لم نتمكن من حفظ تأكيد حضورك. يرجى المحاولة مرة أخرى.",
     "formIncomplete": "يرجى إكمال النموذج",

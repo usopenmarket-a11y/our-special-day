@@ -2,9 +2,11 @@ import { motion } from "framer-motion";
 import { weddingConfig } from "@/lib/weddingConfig";
 import { Heart } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toArabicNumerals } from "@/lib/arabicNumbers";
 
 const Footer = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   return (
     <footer className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 border-t border-border/50 relative overflow-hidden">
       {/* Decorative background elements */}
@@ -44,7 +46,7 @@ const Footer = () => {
           </p>
 
           <p className="text-xs font-body text-muted-foreground/60 mt-6">
-            FSinvitation © {new Date().getFullYear()}
+            FSinvitation © {toArabicNumerals(new Date().getFullYear(), isArabic)}
           </p>
         </motion.div>
       </div>

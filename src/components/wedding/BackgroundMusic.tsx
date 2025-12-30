@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Volume2, VolumeX, AlertCircle, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 interface BackgroundMusicProps {
   src: string | string[]; // Support both single URL and playlist
@@ -11,6 +12,8 @@ interface BackgroundMusicProps {
 }
 
 const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: BackgroundMusicProps) => {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -403,7 +406,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
           {/* Song counter for playlists */}
           {playlist.length > 1 && (
             <div className="text-xs text-muted-foreground bg-card/80 backdrop-blur-sm px-2 py-1 rounded">
-              {currentSongIndex + 1} / {playlist.length}
+              {toArabicNumerals(currentSongIndex + 1, isArabic)} / {toArabicNumerals(playlist.length, isArabic)}
             </div>
           )}
           

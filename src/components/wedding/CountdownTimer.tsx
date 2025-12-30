@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { formatNumber } from "@/lib/arabicNumbers";
 
 interface CountdownTimerProps {
   targetDate: string;
@@ -14,7 +15,8 @@ interface TimeLeft {
 }
 
 const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     days: 0,
     hours: 0,
@@ -62,7 +64,7 @@ const CountdownTimer = ({ targetDate }: CountdownTimerProps) => {
           <div className="relative">
             <div className="w-16 h-16 sm:w-18 sm:h-18 md:w-24 md:h-24 rounded-lg bg-card shadow-soft border border-border/50 flex items-center justify-center">
               <span className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl font-display font-semibold text-foreground">
-                {String(unit.value).padStart(2, "0")}
+                {formatNumber(unit.value, isArabic, { minDigits: 2 })}
               </span>
             </div>
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-12 sm:w-14 md:w-16 h-1 bg-gradient-to-r from-transparent via-gold/30 to-transparent" />

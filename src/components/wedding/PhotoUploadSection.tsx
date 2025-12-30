@@ -7,6 +7,7 @@ import { Upload, X, Check, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
+import { toArabicNumerals } from "@/lib/arabicNumbers";
 
 interface UploadedFile {
   id: string;
@@ -16,7 +17,8 @@ interface UploadedFile {
 }
 
 const PhotoUploadSection = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const { config } = useAppConfig();
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -418,8 +420,8 @@ const PhotoUploadSection = () => {
       toast({
         title: t("upload.success"),
         description: successCount === 1 
-          ? t("upload.photosUploaded", { count: 1 })
-          : t("upload.photosUploadedPlural", { count: successCount }),
+          ? t("upload.photosUploaded", { count: toArabicNumerals(1, isArabic) })
+          : t("upload.photosUploadedPlural", { count: toArabicNumerals(successCount, isArabic) }),
       });
     } else if (errorCount > 0) {
       // All uploads failed
@@ -531,11 +533,11 @@ const PhotoUploadSection = () => {
                   <h3 className="font-display font-medium text-foreground">
                     {pendingFiles.length > 0
                       ? pendingFiles.length === 1
-                        ? t("upload.photosReady", { count: pendingFiles.length })
-                        : t("upload.photosReadyPlural", { count: pendingFiles.length })
+                        ? t("upload.photosReady", { count: toArabicNumerals(pendingFiles.length, isArabic) })
+                        : t("upload.photosReadyPlural", { count: toArabicNumerals(pendingFiles.length, isArabic) })
                       : uploadedFiles.length === 1
-                      ? t("upload.photosUploaded", { count: uploadedFiles.length })
-                      : t("upload.photosUploadedPlural", { count: uploadedFiles.length })}
+                      ? t("upload.photosUploaded", { count: toArabicNumerals(uploadedFiles.length, isArabic) })
+                      : t("upload.photosUploadedPlural", { count: toArabicNumerals(uploadedFiles.length, isArabic) })}
                   </h3>
                   {pendingFiles.length > 0 && (
                     <Button
