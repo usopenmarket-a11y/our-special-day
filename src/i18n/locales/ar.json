@@ -25,6 +25,7 @@
   },
   "rsvp": {
     "title": "تأكيد الحضور",
+    "subtitle": "",
     "searchPlaceholder": "ابحث عن اسمك...",
     "selectName": "اختر اسمك من القائمة",
     "confirmAttendance": "أكد حضورك",
@@ -66,6 +67,7 @@
   "gallery": {
     "ourMoments": "لحظات لا تُنسى",
     "title": "معرض الصور",
+    "subtitle": "",
     "loading": "جاري تحميل المعرض...",
     "error": "تعذر تحميل المعرض",
     "errorMessage": "لم نتمكن من تحميل المعرض. يرجى المحاولة مرة أخرى لاحقاً.",
