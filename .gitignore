@@ -34,3 +34,21 @@ gen-lang-client-*.json
 *.njsproj
 *.sln
 *.sw?
+
+# Test uploads and media files
+test-uploads/
+*.mp4
+*.mov
+*.avi
+*.webm
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.heic
+*.heif
+!public/**/*.jpg
+!public/**/*.jpeg
+!public/**/*.png
+!public/**/*.gif
+!public/**/*.svg
