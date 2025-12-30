@@ -206,33 +206,30 @@ serve(async (req) => {
     const closeDelimiter = `\r\n--${boundary}--`;
 
     // Convert fileBuffer to base64 efficiently
-    // For large files, process in chunks to avoid memory issues
+    // Always use chunked encoding to avoid stack overflow (spread operator causes issues)
     let base64Data: string;
     try {
       const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);
-      console.log(`Encoding file to base64 (${fileSizeMB}MB)...`);
+      console.log(`Encoding file to base64 (${fileSizeMB}MB, ${fileBuffer.length} bytes)...`);
       
-      // For files larger than 5MB, use chunked encoding
-      if (fileBuffer.length > 5 * 1024 * 1024) {
-        console.log('Using chunked base64 encoding for large file');
-        const chunkSize = 8192; // 8KB chunks
-        let binaryString = '';
-        
-        for (let i = 0; i < fileBuffer.length; i += chunkSize) {
-          const chunk = fileBuffer.slice(i, Math.min(i + chunkSize, fileBuffer.length));
-          // Build binary string chunk by chunk
-          for (let j = 0; j < chunk.length; j++) {
-            binaryString += String.fromCharCode(chunk[j]);
-          }
-        }
-        
-        base64Data = btoa(binaryString);
-      } else {
-        // For smaller files, use the standard method
-        base64Data = btoa(String.fromCharCode(...fileBuffer));
+      // Use chunked encoding for all files to avoid stack overflow
+      // Process in chunks and build the binary string incrementally
+      const chunkSize = 16384; // 16KB chunks - larger chunks reduce string concatenation overhead
+      let binaryString = '';
+      
+      // Process file in chunks to avoid stack overflow
+      for (let i = 0; i < fileBuffer.length; i += chunkSize) {
+        const chunk = fileBuffer.slice(i, Math.min(i + chunkSize, fileBuffer.length));
+        // Convert chunk to string using Array.from and map to avoid spread operator
+        const chunkArray = Array.from(chunk);
+        const chunkString = chunkArray.map(byte => String.fromCharCode(byte)).join('');
+        binaryString += chunkString;
       }
       
-      console.log(`Base64 encoding complete (${(base64Data.length / 1024 / 1024).toFixed(2)}MB)`);
+      // Convert the complete binary string to base64
+      base64Data = btoa(binaryString);
+      
+      console.log(`Base64 encoding complete (${(base64Data.length / 1024 / 1024).toFixed(2)}MB base64)`);
     } catch (base64Error) {
       console.error('Base64 encoding error:', base64Error);
       const fileSizeMB = (fileBuffer.length / 1024 / 1024).toFixed(2);

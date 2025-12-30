@@ -92,7 +92,7 @@
     "invalidFile": "Invalid file type",
     "invalidFileMessage": "{{fileName}} is not a supported file. Accepted: JPEG, PNG, GIF, HEIC, MP4, MOV, AVI, WebM.",
     "fileTooLarge": "File too large",
-    "fileTooLargeMessage": "{{fileName}} ({{fileSize}}MB) exceeds {{maxSize}}MB limit for {{fileType}}.",
+    "fileTooLargeMessage": "{{fileName}}: {{fileSize}}MB exceeds {{maxSize}}MB limit for {{fileType}}.",
     "image": "images",
     "video": "videos",
     "remove": "Remove",

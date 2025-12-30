@@ -92,7 +92,7 @@
     "invalidFile": "نوع ملف غير صالح",
     "invalidFileMessage": "{{fileName}} ليس ملفاً مدعوماً. المقبول: JPEG، PNG، GIF، HEIC، MP4، MOV، AVI، WebM.",
     "fileTooLarge": "الملف كبير جداً",
-    "fileTooLargeMessage": "{{fileName}} ({{fileSize}} ميجابايت) يتجاوز حد {{maxSize}} ميجابايت لـ {{fileType}}.",
+    "fileTooLargeMessage": "{{fileName}}: {{fileSize}} ميجابايت يتجاوز حد {{maxSize}} ميجابايت لـ {{fileType}}.",
     "image": "الصور",
     "video": "الفيديوهات",
     "remove": "إزالة",
