@@ -61,6 +61,7 @@ const RSVPSection = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedAttendance, setSubmittedAttendance] = useState<"attending" | "not-attending" | "">("");
   const [searchCount, setSearchCount] = useState(getSearchCount().count);
   const { toast } = useToast();
 
@@ -231,9 +232,12 @@ const RSVPSection = () => {
       }
 
       setIsSubmitted(true);
+      setSubmittedAttendance(attendance);
       toast({
         title: t("rsvp.success"),
-        description: t("rsvp.successMessage"),
+        description: attendance === "attending" 
+          ? t("rsvp.attendingMessage")
+          : t("rsvp.notAttendingMessage"),
       });
     } catch (err) {
       console.error('Failed to save RSVP:', err);
@@ -280,7 +284,9 @@ const RSVPSection = () => {
             transition={{ duration: 0.6, delay: 0.4 }}
             className="text-lg font-body text-muted-foreground"
           >
-            {t("rsvp.successMessage")}
+            {submittedAttendance === "attending" 
+              ? t("rsvp.attendingMessage")
+              : t("rsvp.notAttendingMessage")}
           </motion.p>
         </div>
       </section>
