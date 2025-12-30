@@ -275,7 +275,10 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     setShowPrompt(false);
 
     if (isPlaying) {
+      // Pause the audio and immediately update state
       audio.pause();
+      setIsPlaying(false);
+      console.log("🎵 ⏸️ Music paused");
     } else {
       try {
         // Unmute if it was muted for autoplay
@@ -285,7 +288,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
           setIsMuted(false);
         }
         await audio.play();
+        setIsPlaying(true);
         setError(null);
+        console.log("🎵 ▶️ Music playing");
       } catch (error) {
         console.error("Failed to play audio:", error);
         setError("Could not play audio. Browser may require user interaction.");
@@ -390,9 +395,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 1 }}
-        className="fixed bottom-6 right-6 z-50"
+        className="fixed bottom-6 right-6 z-50 pointer-events-none"
       >
-        <div className="flex flex-col gap-2 items-end">
+        <div className="flex flex-col gap-2 items-end pointer-events-auto">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -424,11 +429,20 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
               </Button>
             )}
             <Button
-              onClick={togglePlay}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePlay();
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               variant="outline"
               size="icon"
-              className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg"
+              className="rounded-full w-12 h-12 bg-card/80 backdrop-blur-sm border-gold/20 hover:bg-card hover:border-gold/40 shadow-lg cursor-pointer touch-manipulation z-50"
               aria-label={isPlaying ? "Pause music" : "Play music"}
+              type="button"
             >
               <AnimatePresence mode="wait">
                 {isPlaying ? (
