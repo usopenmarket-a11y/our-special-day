@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAppConfig } from "@/lib/ConfigContext";
 import { useTranslation } from "react-i18next";
 import { toArabicNumerals } from "@/lib/arabicNumbers";
+import imageCompression from "browser-image-compression";
 
 interface UploadedFile {
   id: string;
@@ -162,8 +163,7 @@ const PhotoUploadSection = () => {
 
     // Upload each file
     for (const uploadFile of pending) {
-      try {
-        // Validate file before processing
+      // Validate file before processing
         if (!config?.uploadFolderId) {
           toast({
             title: t("upload.uploadUnavailable"),
@@ -207,144 +207,110 @@ const PhotoUploadSection = () => {
           continue;
         }
 
-        const fileSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
-        console.log(`Uploading: ${uploadFile.file.name} (${fileSizeMB}MB, type: ${uploadFile.file.type}, ${isVideo ? 'video' : 'image'})`);
+        const originalSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
+        console.log(`Processing: ${uploadFile.file.name} (${originalSizeMB}MB, type: ${uploadFile.file.type}, ${isVideo ? 'video' : 'image'})`);
 
-        // Read file as base64
-        // Use FileReader API for better handling of large files
-        let base64: string;
-        try {
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              if (typeof reader.result === 'string') {
-                // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
-                const base64String = reader.result.split(',')[1] || reader.result;
-                console.log(`Base64 encoding complete for ${uploadFile.file.name} (base64 length: ${base64String.length})`);
-                resolve(base64String);
-              } else {
-                reject(new Error('Failed to read file as base64'));
-              }
+        // Optimize images: compress and resize (skip for videos)
+        let fileToUpload: File = uploadFile.file;
+        if (!isVideo) {
+          try {
+            console.log(`Compressing image: ${uploadFile.file.name}...`);
+            const compressionOptions = {
+              maxSizeMB: 20, // Maximum file size in MB (will compress to fit)
+              maxWidthOrHeight: 4000, // Resize to max 4000px width/height (maintains aspect ratio)
+              useWebWorker: true, // Use web worker for better performance
+              fileType: uploadFile.file.type, // Preserve original file type
+              initialQuality: 0.95, // 95% quality (maximum quality, virtually no visible loss)
             };
-            reader.onerror = (e) => {
-              console.error(`FileReader error for ${uploadFile.file.name}:`, e);
-              reject(new Error(`File reading failed: ${e.type || 'unknown error'}`));
-            };
-            reader.readAsDataURL(uploadFile.file);
-          });
-        } catch (base64Error) {
-          console.error(`Base64 encoding failed for ${uploadFile.file.name}:`, base64Error);
-          const errorMsg = base64Error instanceof Error ? base64Error.message : 'Failed to encode file';
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
-            )
-          );
-          errorCount++;
-          toast({
-            title: t("upload.uploadFailed"),
-            description: `${uploadFile.file.name}: ${errorMsg}`,
-            variant: "destructive",
-          });
-          continue;
+
+            const compressedFile = await imageCompression(uploadFile.file, compressionOptions);
+            const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2);
+            const compressionRatio = ((1 - compressedFile.size / uploadFile.file.size) * 100).toFixed(1);
+            
+            console.log(`Image compressed: ${uploadFile.file.name} - ${originalSizeMB}MB → ${compressedSizeMB}MB (${compressionRatio}% reduction)`);
+            fileToUpload = compressedFile;
+          } catch (compressionError) {
+            console.warn(`Image compression failed for ${uploadFile.file.name}, using original:`, compressionError);
+            // Continue with original file if compression fails
+            fileToUpload = uploadFile.file;
+          }
         }
 
-        const payload = {
-          fileName: uploadFile.file.name,
-          mimeType: uploadFile.file.type,
-          base64,
-          folderId: config.uploadFolderId,
-        };
+        const finalSizeMB = (fileToUpload.size / 1024 / 1024).toFixed(2);
+        console.log(`Uploading: ${uploadFile.file.name} (${finalSizeMB}MB${!isVideo && fileToUpload !== uploadFile.file ? ' - compressed' : ''})`);
+
+        // Use FormData for direct binary upload (much faster than base64)
+        const formData = new FormData();
+        formData.append('file', fileToUpload);
+        if (config.uploadFolderId) {
+          formData.append('folderId', config.uploadFolderId);
+        }
 
         let responseData: any;
         let errorMessage = t("upload.errorMessage");
         
         try {
-          const { data, error } = await supabase.functions.invoke("upload-photo", {
-            body: payload,
+          // Use fetch directly with FormData for multipart upload (faster than base64)
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+          const { data: { session } } = await supabase.auth.getSession();
+          const accessToken = session?.access_token;
+
+          if (!supabaseUrl || !supabaseKey) {
+            throw new Error('Supabase configuration missing. Please check environment variables.');
+          }
+
+          if (!accessToken) {
+            throw new Error('Authentication required. Please refresh the page.');
+          }
+
+          const response = await fetch(`${supabaseUrl}/functions/v1/upload-photo`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'apikey': supabaseKey,
+            },
+            body: formData,
           });
 
-          // Check for errors - when Edge Function returns non-2xx, error is set but data may contain error details
-          if (error) {
-            console.error("Upload error for", uploadFile.file.name, ":", error);
-            console.error("Error object:", JSON.stringify(error, null, 2));
-            console.error("Error data:", data);
-            console.error("Error message:", error.message);
-            console.error("Error context:", error.context);
-            
-            // Priority 1: Check if data contains error details (Edge Function returns { success: false, error: "..." })
-            // Supabase may still parse the response body into data even when error is set
-            if (data && typeof data === 'object') {
-              const dataError = (data as any).error || (data as any).message || (data as any).reason;
-              if (dataError) {
-                errorMessage = typeof dataError === 'string' ? dataError : JSON.stringify(dataError);
-                console.log("Extracted error from data:", errorMessage);
-              }
-            }
-            
-            // Priority 2: Check error.context (Supabase sometimes puts response body here)
-            if (errorMessage === t("upload.errorMessage") && error.context) {
-              try {
-                const contextError = typeof error.context === 'string' 
-                  ? JSON.parse(error.context) 
-                  : error.context;
-                if (contextError?.error || contextError?.message) {
-                  errorMessage = contextError.error || contextError.message;
-                  console.log("Extracted error from context:", errorMessage);
-                }
-              } catch (e) {
-                // Context is not JSON, try as string
-                if (typeof error.context === 'string' && error.context.length < 500) {
-                  errorMessage = error.context;
-                  console.log("Using context as error message:", errorMessage);
-                }
-              }
-            }
-            
-            // Priority 3: Check if error has a message property
-            if (errorMessage === t("upload.errorMessage") && error.message) {
-              // Only use if it's not the generic "non-2xx" message
-              if (!error.message.includes('non-2xx') || data) {
-                errorMessage = error.message;
-                console.log("Using error.message:", errorMessage);
-              }
-            } 
-            // Priority 4: Check if error is a string
-            else if (errorMessage === t("upload.errorMessage") && typeof error === 'string') {
-              errorMessage = error;
-              console.log("Using error as string:", errorMessage);
-            }
-            // Priority 5: Try to extract from error object
-            else if (errorMessage === t("upload.errorMessage") && typeof error === 'object') {
-              const errorStr = JSON.stringify(error);
-              // Only use if it's not the generic "non-2xx" message and has useful info
-              if (!errorStr.includes('non-2xx') && errorStr.length < 500) {
-                errorMessage = errorStr;
-                console.log("Using stringified error:", errorMessage);
-              }
-            }
-            
-            setFiles((prev) =>
-              prev.map((f) =>
-                f.id === uploadFile.id ? { ...f, status: "error" as const } : f
-              )
-            );
-            errorCount++;
-            toast({
-              title: t("upload.uploadFailed"),
-              description: `${uploadFile.file.name}: ${errorMessage}`,
-              variant: "destructive",
-            });
-            continue;
+          const data = await response.json();
+          
+          if (!response.ok || !data.success) {
+            const error = data?.error || data?.message || `Upload failed with status ${response.status}`;
+            throw new Error(error);
           }
 
           responseData = data;
-        } catch (invokeError) {
-          // Catch any errors from the invoke itself
-          console.error("Invoke error for", uploadFile.file.name, ":", invokeError);
-          errorMessage = invokeError instanceof Error 
-            ? invokeError.message 
-            : (typeof invokeError === 'string' ? invokeError : JSON.stringify(invokeError)) || t("upload.errorMessage");
+
+          // Check response data - must have success: true AND an id
+          const isSuccess = 
+            responseData && 
+            typeof responseData === "object" && 
+            responseData.success === true && 
+            responseData.id;
+
+          if (!isSuccess) {
+            const errorMsg = responseData?.error || 
+                            (responseData?.success === false ? responseData.error : undefined) ||
+                            responseData?.message ||
+                            "Upload failed - no file ID returned";
+            throw new Error(errorMsg);
+          }
+
+          // Only mark as success if we have a valid file ID
+          console.log("Upload successful:", responseData.id, responseData.name);
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploadFile.id ? { ...f, status: "success" as const } : f
+            )
+          );
+          successCount++;
+        } catch (uploadError) {
+          // Catch any errors from the upload
+          console.error("Upload error for", uploadFile.file.name, ":", uploadError);
+          errorMessage = uploadError instanceof Error 
+            ? uploadError.message 
+            : (typeof uploadError === 'string' ? uploadError : JSON.stringify(uploadError)) || t("upload.errorMessage");
           
           setFiles((prev) =>
             prev.map((f) =>
@@ -359,69 +325,15 @@ const PhotoUploadSection = () => {
           });
           continue;
         }
-
-        // Check response data - must have success: true AND an id
-        const isSuccess = 
-          responseData && 
-          typeof responseData === "object" && 
-          responseData.success === true && 
-          responseData.id;
-
-        if (!isSuccess) {
-          const errorMsg = responseData?.error || 
-                          (responseData?.success === false ? responseData.error : undefined) ||
-                          responseData?.message ||
-                          "Upload failed - no file ID returned";
-          console.error("Upload failed for", uploadFile.file.name, "- invalid response:", responseData);
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === uploadFile.id ? { ...f, status: "error" as const } : f
-            )
-          );
-          errorCount++;
-          toast({
-            title: t("upload.uploadFailed"),
-            description: `${uploadFile.file.name}: ${errorMsg}`,
-            variant: "destructive",
-          });
-          continue;
-        }
-
-        // Only mark as success if we have a valid file ID
-        console.log("Upload successful:", responseData.id, responseData.name);
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === uploadFile.id ? { ...f, status: "success" as const } : f
-          )
-        );
-        successCount++;
-      } catch (err) {
-        console.error("Upload failed for", uploadFile.file.name, ":", err);
-        const errorMessage = err instanceof Error 
-          ? err.message 
-          : (typeof err === 'string' ? err : JSON.stringify(err)) || t("upload.errorMessage");
-        
-        setFiles((prev) =>
-          prev.map((f) =>
-            f.id === uploadFile.id ? { ...f, status: "error" as const } : f
-          )
-        );
-        errorCount++;
-        toast({
-          title: t("upload.error"),
-          description: `${uploadFile.file.name}: ${errorMessage}`,
-          variant: "destructive",
-        });
       }
-    }
 
     // Only show success toast if at least one file was successfully uploaded
     if (successCount > 0) {
       toast({
         title: t("upload.success"),
         description: successCount === 1 
-          ? t("upload.photosUploaded", { count: toArabicNumerals(1, isArabic) })
-          : t("upload.photosUploadedPlural", { count: toArabicNumerals(successCount, isArabic) }),
+          ? t("upload.photosUploaded", { count: 1 })
+          : t("upload.photosUploadedPlural", { count: successCount }),
       });
     } else if (errorCount > 0) {
       // All uploads failed
@@ -533,11 +445,11 @@ const PhotoUploadSection = () => {
                   <h3 className="font-display font-medium text-foreground">
                     {pendingFiles.length > 0
                       ? pendingFiles.length === 1
-                        ? t("upload.photosReady", { count: toArabicNumerals(pendingFiles.length, isArabic) })
-                        : t("upload.photosReadyPlural", { count: toArabicNumerals(pendingFiles.length, isArabic) })
+                        ? toArabicNumerals(t("upload.photosReady", { count: pendingFiles.length }), isArabic)
+                        : toArabicNumerals(t("upload.photosReadyPlural", { count: pendingFiles.length }), isArabic)
                       : uploadedFiles.length === 1
-                      ? t("upload.photosUploaded", { count: toArabicNumerals(uploadedFiles.length, isArabic) })
-                      : t("upload.photosUploadedPlural", { count: toArabicNumerals(uploadedFiles.length, isArabic) })}
+                      ? toArabicNumerals(t("upload.photosUploaded", { count: uploadedFiles.length }), isArabic)
+                      : toArabicNumerals(t("upload.photosUploadedPlural", { count: uploadedFiles.length }), isArabic)}
                   </h3>
                   {pendingFiles.length > 0 && (
                     <Button

@@ -139,6 +139,19 @@ const DetailsSection = () => {
             </Card>
           </motion.div>
         </div>
+
+        {/* Good Night Message */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="text-center mt-12 sm:mt-16"
+        >
+          <p className="text-lg sm:text-xl md:text-2xl font-body text-muted-foreground italic max-w-2xl mx-auto px-4">
+            {t("footer.goodNightForChildren")}
+          </p>
+        </motion.div>
       </div>
     </section>
   );
