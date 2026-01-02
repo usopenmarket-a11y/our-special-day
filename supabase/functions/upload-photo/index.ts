@@ -165,15 +165,38 @@ serve(async (req) => {
     let folderId = Deno.env.get('UPLOAD_FOLDER_ID');
 
     const contentType = req.headers.get('content-type') || '';
+    console.log('Content-Type:', contentType);
+    
     if (contentType.includes('multipart/form-data')) {
-      const formData = await req.formData();
-      const file = formData.get('file') as File | null;
-      folderId = (formData.get('folderId') as string) || folderId;
-      if (!file) throw new Error('File is required (multipart)');
-      fileName = file.name;
-      mimeType = file.type || 'application/octet-stream';
-      const ab = await file.arrayBuffer();
-      fileBuffer = new Uint8Array(ab);
+      console.log('Processing multipart/form-data request...');
+      try {
+        const formData = await req.formData();
+        console.log('FormData parsed successfully');
+        
+        const file = formData.get('file') as File | null;
+        if (!file) {
+          console.error('No file found in formData');
+          throw new Error('File is required (multipart)');
+        }
+        
+        folderId = (formData.get('folderId') as string) || folderId;
+        fileName = file.name;
+        mimeType = file.type || 'application/octet-stream';
+        
+        console.log('File details from FormData:', {
+          fileName,
+          mimeType,
+          size: file.size,
+          folderId
+        });
+        
+        const ab = await file.arrayBuffer();
+        fileBuffer = new Uint8Array(ab);
+        console.log(`File buffer created: ${fileBuffer.length} bytes`);
+      } catch (formDataError) {
+        console.error('Error processing FormData:', formDataError);
+        throw new Error(`Failed to process multipart form data: ${formDataError instanceof Error ? formDataError.message : 'Unknown error'}`);
+      }
     } else {
       const json = await req.json();
       const { fileName: fn, mimeType: mt, base64, folderId: fid } = json || {};
