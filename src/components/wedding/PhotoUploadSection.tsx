@@ -177,9 +177,13 @@ const PhotoUploadSection = () => {
     let successCount = 0;
     let errorCount = 0;
 
-    // Upload each file
-    for (const uploadFile of pending) {
-
+    // WhatsApp-like parallel uploads: Process multiple files simultaneously for faster uploads
+    // Limit concurrent uploads to 3 to avoid overwhelming the server/network
+    const MAX_CONCURRENT_UPLOADS = 3;
+    
+    // Define uploadSingleFile function inside uploadFiles to have access to config
+    const uploadSingleFile = async (uploadFile: UploadedFile): Promise<boolean> => {
+      try {
         // Validate file size again (client-side check) - different limits for images vs videos
         const isVideo = isVideoFile(uploadFile.file);
         const maxSize = isVideo 
@@ -204,40 +208,88 @@ const PhotoUploadSection = () => {
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
-          errorCount++;
-          continue;
+          return false;
         }
 
         const originalSizeMB = (uploadFile.file.size / 1024 / 1024).toFixed(2);
         console.log(`Processing: ${uploadFile.file.name} (${originalSizeMB}MB, type: ${uploadFile.file.type}, ${isVideo ? 'video' : 'image'})`);
 
-        // Optimize images: compress and resize (skip for videos and very small files)
+        // WhatsApp-like optimization: Smart compression with quality preservation
+        // Strategy: Resize to reasonable dimensions (like WhatsApp HD ~1600px) while maintaining quality
         let fileToUpload: File = uploadFile.file;
-        if (!isVideo && uploadFile.file.size > 100 * 1024) { // Only compress files larger than 100KB
-          try {
-            console.log(`Compressing image: ${uploadFile.file.name}...`);
-            const compressionOptions = {
-              maxSizeMB: 20, // Maximum file size in MB (will compress to fit)
-              maxWidthOrHeight: 4000, // Resize to max 4000px width/height (maintains aspect ratio)
-              useWebWorker: true, // Use web worker for better performance
-              fileType: uploadFile.file.type, // Preserve original file type
-              initialQuality: 0.95, // 95% quality (maximum quality, virtually no visible loss)
-            };
+        if (!isVideo) {
+          // Determine optimal compression based on file size and dimensions
+          const fileSizeKB = uploadFile.file.size / 1024;
+          
+          // For images, always optimize (even small ones) for consistency and speed
+          if (fileSizeKB > 50) { // Only compress files larger than 50KB
+            try {
+              console.log(`Optimizing image: ${uploadFile.file.name}...`);
+              
+              // WhatsApp-like strategy: Smart dimension limits based on file size
+              // - Small files (< 1MB): Keep original dimensions, just optimize quality
+              // - Medium files (1-5MB): Resize to max 1920px (HD quality)
+              // - Large files (> 5MB): Resize to max 1600px (WhatsApp HD standard)
+              let maxDimension: number;
+              let targetQuality: number;
+              let maxSizeMB: number;
+              
+              if (fileSizeKB < 1024) {
+                // Small files: Keep original size, optimize quality only
+                maxDimension = 4000; // Very high limit, won't resize
+                targetQuality = 0.92; // High quality
+                maxSizeMB = 5; // Target size
+              } else if (fileSizeKB < 5120) {
+                // Medium files: HD quality (1920px)
+                maxDimension = 1920;
+                targetQuality = 0.90; // High quality
+                maxSizeMB = 3; // Target size
+              } else {
+                // Large files: WhatsApp HD standard (1600px)
+                maxDimension = 1600;
+                targetQuality = 0.88; // Very good quality
+                maxSizeMB = 2; // Target size
+              }
+              
+              const compressionOptions = {
+                maxSizeMB, // Target file size
+                maxWidthOrHeight: maxDimension, // Smart dimension limit
+                useWebWorker: true, // Use web worker for non-blocking compression
+                fileType: uploadFile.file.type, // Preserve original format
+                initialQuality: targetQuality, // Adaptive quality based on file size
+                alwaysKeepResolution: false, // Allow resizing for better compression
+              };
 
-            const compressedFile = await imageCompression(uploadFile.file, compressionOptions);
-            const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2);
-            const compressionRatio = ((1 - compressedFile.size / uploadFile.file.size) * 100).toFixed(1);
-            
-            console.log(`Image compressed: ${uploadFile.file.name} - ${originalSizeMB}MB → ${compressedSizeMB}MB (${compressionRatio}% reduction)`);
-            fileToUpload = compressedFile;
-          } catch (compressionError) {
-            const errorMsg = compressionError instanceof Error ? compressionError.message : String(compressionError);
-            console.warn(`Image compression failed for ${uploadFile.file.name}, using original:`, errorMsg);
-            // Continue with original file if compression fails
-            fileToUpload = uploadFile.file;
+              const compressedFile = await imageCompression(uploadFile.file, compressionOptions);
+              const compressedSizeMB = (compressedFile.size / 1024 / 1024).toFixed(2);
+              const compressionRatio = ((1 - compressedFile.size / uploadFile.file.size) * 100).toFixed(1);
+              
+              // Only use compressed version if it's significantly smaller (at least 10% reduction)
+              if (compressedFile.size < uploadFile.file.size * 0.9) {
+                console.log(`✅ Optimized: ${uploadFile.file.name} - ${originalSizeMB}MB → ${compressedSizeMB}MB (${compressionRatio}% reduction, ${maxDimension}px max)`);
+                fileToUpload = compressedFile;
+              } else {
+                console.log(`ℹ️ Compression didn't help much, using original: ${uploadFile.file.name}`);
+                fileToUpload = uploadFile.file;
+              }
+            } catch (compressionError) {
+              // Handle different error types - compression library may throw Event objects
+              let errorMsg = 'Unknown compression error';
+              if (compressionError instanceof Error) {
+                errorMsg = compressionError.message;
+              } else if (compressionError && typeof compressionError === 'object' && 'type' in compressionError) {
+                // Handle Event objects
+                errorMsg = `Compression error: ${(compressionError as any).type || 'compression failed'}`;
+              } else {
+                errorMsg = String(compressionError);
+              }
+              console.warn(`Image optimization failed for ${uploadFile.file.name}, using original:`, errorMsg);
+              // Continue with original file if compression fails
+              fileToUpload = uploadFile.file;
+            }
+          } else {
+            console.log(`Skipping optimization for very small file: ${uploadFile.file.name} (${(fileSizeKB).toFixed(2)}KB)`);
           }
-        } else if (!isVideo) {
-          console.log(`Skipping compression for small file: ${uploadFile.file.name} (${originalSizeMB}MB)`);
         }
 
         const finalSizeMB = (fileToUpload.size / 1024 / 1024).toFixed(2);
@@ -419,12 +471,13 @@ const PhotoUploadSection = () => {
               f.id === uploadFile.id ? { ...f, status: "success" as const } : f
             )
           );
-          successCount++;
+          return true; // Success
         } catch (uploadError) {
           // Catch any errors from the upload
           console.error("Upload error for", uploadFile.file.name, ":", uploadError);
           
           // Extract detailed error message - handle all error types
+          let errorMessage = t("upload.errorMessage");
           if (uploadError instanceof Error) {
             errorMessage = uploadError.message;
             console.error("Error stack:", uploadError.stack);
@@ -432,7 +485,7 @@ const PhotoUploadSection = () => {
             errorMessage = uploadError;
           } else if (uploadError && typeof uploadError === 'object') {
             // Try to extract message from error object
-            errorMessage = uploadError.message || uploadError.error || uploadError.toString() || JSON.stringify(uploadError);
+            errorMessage = (uploadError as any).message || (uploadError as any).error || uploadError.toString() || JSON.stringify(uploadError);
           } else {
             try {
               errorMessage = JSON.stringify(uploadError);
@@ -456,7 +509,7 @@ const PhotoUploadSection = () => {
             try {
               errorDetails.errorProperties = Object.keys(uploadError).reduce((acc: Record<string, string>, key) => {
                 try {
-                  acc[key] = String(uploadError[key as keyof typeof uploadError]);
+                  acc[key] = String((uploadError as any)[key]);
                 } catch {
                   acc[key] = '[Cannot serialize]';
                 }
@@ -474,15 +527,42 @@ const PhotoUploadSection = () => {
               f.id === uploadFile.id ? { ...f, status: "error" as const } : f
             )
           );
-          errorCount++;
           toast({
             title: t("upload.uploadFailed"),
             description: `${uploadFile.file.name}: ${errorMessage}`,
             variant: "destructive",
           });
-          continue;
+          return false; // Failure
         }
+      } catch (error) {
+        // Catch any unexpected errors
+        console.error("Unexpected error uploading", uploadFile.file.name, ":", error);
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === uploadFile.id ? { ...f, status: "error" as const } : f
+          )
+        );
+        return false; // Failure
       }
+    };
+    
+    // Process files in batches for parallel upload
+    for (let i = 0; i < pending.length; i += MAX_CONCURRENT_UPLOADS) {
+      const batch = pending.slice(i, i + MAX_CONCURRENT_UPLOADS);
+      
+      // Upload batch in parallel
+      const uploadPromises = batch.map(uploadFile => uploadSingleFile(uploadFile));
+      const results = await Promise.allSettled(uploadPromises);
+      
+      // Count successes and errors
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value === true) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
+      });
+    }
 
     // Only show success toast if at least one file was successfully uploaded
     if (successCount > 0) {

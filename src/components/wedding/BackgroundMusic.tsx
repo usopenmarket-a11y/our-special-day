@@ -297,7 +297,51 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       }
     }
   };
-  
+
+  // Stop music when tab is switched or browser is closed (especially for mobile)
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleVisibilityChange = () => {
+      // When tab becomes hidden (user switches tab or minimizes browser)
+      if (document.hidden && !audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+        console.log("🎵 ⏸️ Music paused - tab switched or browser minimized");
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      // When user is about to close the browser/tab
+      if (!audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+        console.log("🎵 ⏸️ Music paused - browser closing");
+      }
+    };
+
+    const handlePageHide = () => {
+      // Additional event for mobile browsers when page is being unloaded
+      if (!audio.paused) {
+        audio.pause();
+        setIsPlaying(false);
+        console.log("🎵 ⏸️ Music paused - page hiding");
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   if (!currentSong) return null;
 
