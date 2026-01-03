@@ -133,8 +133,17 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
     font-family: var(--font-body);
+    /* Very faded background image */
+    background-image: 
+      linear-gradient(hsl(var(--background) / 0.88), hsl(var(--background) / 0.88)),
+      url('/background.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    background-color: hsl(var(--background));
   }
 
   h1, h2, h3, h4, h5, h6 {
