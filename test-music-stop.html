@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Stop Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.playing {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.paused {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.hidden {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Music Stop on Tab Switch Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Instructions</h2>
+        <ol>
+            <li>Click "Start Music" to begin playback</li>
+            <li>Switch to another browser tab (or minimize the window)</li>
+            <li>Check the logs below - music should pause automatically</li>
+            <li>Switch back to this tab</li>
+            <li>Music should remain paused (not auto-resume)</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Controls</h2>
+        <button id="playBtn">▶️ Start Music</button>
+        <button id="pauseBtn">⏸️ Pause Music</button>
+        <button id="resetBtn">🔄 Reset Test</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Status</h2>
+        <div id="status" class="status paused">Paused</div>
+        <div>
+            <strong>Audio State:</strong>
+            <span id="audioState">-</span>
+        </div>
+        <div>
+            <strong>Tab Visibility:</strong>
+            <span id="visibilityState">-</span>
+        </div>
+        <div>
+            <strong>Current Time:</strong>
+            <span id="currentTime">0.00s</span>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Event Log</h2>
+        <div id="log" class="log"></div>
+    </div>
+
+    <audio id="audio" preload="auto">
+        <source src="/music/die with smile.mp3" type="audio/mpeg">
+        <source src="/music/La leçon particulière.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.getElementById('status');
+        const audioState = document.getElementById('audioState');
+        const visibilityState = document.getElementById('visibilityState');
+        const currentTime = document.getElementById('currentTime');
+        const log = document.getElementById('log');
+        
+        let wasPlayingBeforeHidden = false;
+
+        function logEvent(message) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `[${time}] ${message}<br>`;
+            log.scrollTop = log.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus() {
+            if (audio.paused) {
+                status.textContent = 'Paused';
+                status.className = 'status paused';
+            } else {
+                status.textContent = 'Playing';
+                status.className = 'status playing';
+            }
+            
+            audioState.textContent = audio.paused ? 'Paused' : 'Playing';
+            visibilityState.textContent = document.hidden ? 'Hidden' : 'Visible';
+            currentTime.textContent = audio.currentTime.toFixed(2) + 's';
+        }
+
+        // Handle visibility change
+        function handleVisibilityChange() {
+            if (document.hidden || document.visibilityState === 'hidden') {
+                wasPlayingBeforeHidden = !audio.paused;
+                logEvent('🔍 Tab became HIDDEN');
+                
+                if (!audio.paused) {
+                    audio.pause();
+                    logEvent('🎵 ⏸️ Music paused - tab switched');
+                    updateStatus();
+                }
+            } else {
+                logEvent('🔍 Tab became VISIBLE');
+                
+                if (wasPlayingBeforeHidden) {
+                    // Check immediately
+                    if (!audio.paused) {
+                        audio.pause();
+                        logEvent('🎵 ⏸️ Music prevented from auto-resuming');
+                        updateStatus();
+                    }
+                    // Also check after delay
+                    setTimeout(() => {
+                        if (!audio.paused && wasPlayingBeforeHidden) {
+                            audio.pause();
+                            logEvent('🎵 ⏸️ Music prevented from auto-resuming (delayed)');
+                            updateStatus();
+                        }
+                        wasPlayingBeforeHidden = false;
+                    }, 100);
+                }
+            }
+            updateStatus();
+        }
+
+        // Handle play event
+        audio.addEventListener('play', () => {
+            logEvent('▶️ Play event fired');
+            updateStatus();
+            
+            // Prevent auto-resume after tab switch
+            if (wasPlayingBeforeHidden && !document.hidden && document.visibilityState === 'visible') {
+                audio.pause();
+                logEvent('🎵 ⏸️ Prevented auto-resume in play handler');
+                wasPlayingBeforeHidden = false;
+                updateStatus();
+            }
+        });
+
+        audio.addEventListener('pause', () => {
+            logEvent('⏸️ Pause event fired');
+            updateStatus();
+        });
+
+        // Event listeners
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', () => {
+            if (!audio.paused) {
+                audio.pause();
+                logEvent('🎵 ⏸️ Music paused - browser closing');
+            }
+        });
+
+        window.addEventListener('pagehide', (e) => {
+            if (!e.persisted && !audio.paused) {
+                audio.pause();
+                logEvent('🎵 ⏸️ Music paused - page hiding');
+            }
+        });
+
+        // Button handlers
+        playBtn.addEventListener('click', () => {
+            audio.play().catch(err => {
+                logEvent('❌ Error playing: ' + err.message);
+            });
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            audio.pause();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            audio.pause();
+            audio.currentTime = 0;
+            wasPlayingBeforeHidden = false;
+            log.innerHTML = '';
+            logEvent('🔄 Test reset');
+            updateStatus();
+        });
+
+        // Update status periodically
+        setInterval(updateStatus, 100);
+
+        // Initial status
+        updateStatus();
+        logEvent('✅ Test page loaded');
+    </script>
+</body>
+</html>
+

@@ -23,6 +23,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
   const [startMuted, setStartMuted] = useState(true); // Start muted for autoplay
   const [showPrompt, setShowPrompt] = useState(false); // Show prompt if autoplay blocked
   const audioRef = useRef<HTMLAudioElement>(null);
+  const wasPlayingBeforeHidden = useRef<boolean>(false); // Track if music was playing before tab was hidden
+  const hasUserInteracted = useRef<boolean>(false); // Track if user has already interacted with music
+  const showPromptRef = useRef<boolean>(false); // Track prompt state for use in event handlers
 
   // Initialize playlist
   useEffect(() => {
@@ -48,6 +51,8 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     if (audio && audio.paused) {
       try {
         setShowPrompt(false); // Hide prompt immediately when user interacts
+        showPromptRef.current = false;
+        hasUserInteracted.current = true; // Mark that user has interacted
         
         // Unmute before playing (in case it was muted for autoplay)
         if (audio.muted && startMuted) {
@@ -55,12 +60,22 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
           setStartMuted(false);
           setIsMuted(false);
         }
+        // Check if audio is ready to play
+        if (audio.readyState < 2) {
+          // Audio not ready, wait a bit
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
         await audio.play();
         setIsPlaying(true);
         setError(null);
         console.log("🎵 ✅ Audio started on user interaction");
       } catch (error) {
-        console.error("Failed to play audio:", error);
+        // Only log error if it's not a common autoplay/interaction error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('play()') && !errorMessage.includes('interaction') && !errorMessage.includes('NotAllowedError')) {
+          console.error("Failed to play audio:", error);
+        }
         setError("Could not play audio. Browser may require user interaction.");
       }
     }
@@ -130,6 +145,24 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     };
 
     const handlePlay = () => {
+      // Only prevent auto-resume if:
+      // 1. Music was paused due to tab switch (wasPlayingBeforeHidden is true)
+      // 2. Tab is visible (not hidden)
+      // 3. This appears to be an auto-resume (not user-initiated)
+      // We check if wasPlayingBeforeHidden is still true - if user clicked play, it would have been reset in togglePlay
+      if (wasPlayingBeforeHidden.current && !document.hidden && document.visibilityState === 'visible') {
+        // This is likely an auto-resume attempt, prevent it
+        audio.pause();
+        setIsPlaying(false);
+        wasPlayingBeforeHidden.current = false; // Reset flag
+        console.log("🎵 ⏸️ Prevented auto-resume after tab switch");
+        return;
+      }
+      
+      // This is a legitimate play (either user-initiated or autoplay)
+      // Reset the flag since we're playing now
+      wasPlayingBeforeHidden.current = false;
+      
       setIsPlaying(true);
       setError(null);
       
@@ -176,16 +209,27 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     const checkAutoplayStatus = () => {
       if (!audio) return;
       
+      // Don't show prompt if user has already interacted or if music was paused due to tab switch
+      if (hasUserInteracted.current || wasPlayingBeforeHidden.current) {
+        console.log("🔍 Skipping autoplay check - user already interacted or music was paused due to tab switch");
+        return;
+      }
+      
       // Check if HTML autoplay worked (audio is playing)
       if (!audio.paused) {
         console.log("🎵 ✅ HTML autoplay worked! Audio is playing automatically.");
         setIsPlaying(true);
         setShowPrompt(false); // Hide prompt if autoplay worked
+        showPromptRef.current = false;
+        hasUserInteracted.current = true; // Mark as interacted since autoplay worked
       } else {
         // HTML autoplay was blocked by browser
-        // Show visual prompt to encourage user interaction
-        setShowPrompt(true);
-        console.log("ℹ️ HTML autoplay blocked - showing prompt to start music");
+        // Only show prompt if user hasn't interacted yet
+        if (!hasUserInteracted.current) {
+          setShowPrompt(true);
+          showPromptRef.current = true;
+          console.log("ℹ️ HTML autoplay blocked - showing prompt to start music");
+        }
       }
     };
     
@@ -271,28 +315,46 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Hide prompt if visible
+    // Hide prompt if visible and mark user as interacted
     setShowPrompt(false);
+    showPromptRef.current = false;
+    hasUserInteracted.current = true;
 
     if (isPlaying) {
       // Pause the audio and immediately update state
       audio.pause();
       setIsPlaying(false);
+      // Reset the flag since user manually paused
+      wasPlayingBeforeHidden.current = false;
       console.log("🎵 ⏸️ Music paused");
     } else {
       try {
+        // Reset the flag before playing - this is a user-initiated play
+        wasPlayingBeforeHidden.current = false;
+        
         // Unmute if it was muted for autoplay
         if (audio.muted && startMuted) {
           audio.muted = false;
           setStartMuted(false);
           setIsMuted(false);
         }
+        
+        // Check if audio is ready to play
+        if (audio.readyState < 2) {
+          // Audio not ready, wait a bit
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
         await audio.play();
         setIsPlaying(true);
         setError(null);
         console.log("🎵 ▶️ Music playing");
       } catch (error) {
-        console.error("Failed to play audio:", error);
+        // Only log error if it's not a common autoplay/interaction error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('play()') && !errorMessage.includes('interaction')) {
+          console.error("Failed to play audio:", error);
+        }
         setError("Could not play audio. Browser may require user interaction.");
       }
     }
@@ -300,46 +362,245 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
   // Stop music when tab is switched or browser is closed (especially for mobile)
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
     const handleVisibilityChange = () => {
+      console.log("🔍 Visibility change detected:", {
+        hidden: document.hidden,
+        visibilityState: document.visibilityState,
+        audioExists: !!audioRef.current,
+        audioPaused: audioRef.current?.paused
+      });
+
+      const audio = audioRef.current;
+      if (!audio) {
+        console.warn("⚠️ Audio element not found in visibility change handler");
+        return;
+      }
+
       // When tab becomes hidden (user switches tab or minimizes browser)
-      if (document.hidden && !audio.paused) {
-        audio.pause();
-        setIsPlaying(false);
-        console.log("🎵 ⏸️ Music paused - tab switched or browser minimized");
+      if (document.hidden || document.visibilityState === 'hidden') {
+        // Save if music was playing before hiding
+        wasPlayingBeforeHidden.current = !audio.paused;
+        console.log("🔍 Tab hidden, wasPlayingBeforeHidden:", wasPlayingBeforeHidden.current);
+        
+        if (!audio.paused) {
+          try {
+            // Pause the audio - use multiple methods to ensure it works
+            audio.pause();
+            // Set currentTime to current position (don't reset, just ensure pause)
+            const currentPos = audio.currentTime;
+            audio.currentTime = currentPos; // This can help ensure pause sticks
+            
+            setIsPlaying(false);
+            console.log("🎵 ⏸️ Music paused - tab switched or browser minimized", {
+              paused: audio.paused,
+              currentTime: audio.currentTime
+            });
+            
+            // Double-check after a brief moment to ensure it stayed paused
+            setTimeout(() => {
+              const audioCheck = audioRef.current;
+              if (audioCheck && !audioCheck.paused) {
+                console.warn("⚠️ Audio resumed after pause, forcing pause again");
+                audioCheck.pause();
+                setIsPlaying(false);
+              }
+            }, 100);
+          } catch (error) {
+            console.error("❌ Error pausing audio:", error);
+          }
+        } else {
+          console.log("🔍 Audio was already paused");
+        }
+      } else {
+        // Tab became visible again
+        console.log("🔍 Tab visible again, wasPlayingBeforeHidden:", wasPlayingBeforeHidden.current);
+        
+        // Hide prompt if it was showing (user already interacted, don't show it again)
+        if (showPromptRef.current) {
+          setShowPrompt(false);
+          showPromptRef.current = false;
+          console.log("🔍 Hiding prompt - tab became visible again");
+        }
+        
+        // Prevent auto-resume - check immediately and also set up a delayed check
+        if (wasPlayingBeforeHidden.current) {
+          // Check immediately if audio is playing
+          if (!audio.paused) {
+            audio.pause();
+            setIsPlaying(false);
+            console.log("🎵 ⏸️ Music prevented from auto-resuming after tab switch");
+          }
+          // Also check after a short delay in case autoplay kicks in
+          setTimeout(() => {
+            const audioCheck = audioRef.current;
+            if (audioCheck && !audioCheck.paused && wasPlayingBeforeHidden.current) {
+              audioCheck.pause();
+              setIsPlaying(false);
+              console.log("🎵 ⏸️ Music prevented from auto-resuming (delayed check)");
+            }
+            wasPlayingBeforeHidden.current = false;
+          }, 100);
+        }
       }
     };
 
     const handleBeforeUnload = () => {
       // When user is about to close the browser/tab
+      // Use synchronous operations only (no async/await)
+      const audio = audioRef.current;
+      if (!audio) return;
+      
+      console.log("🔍 Beforeunload event detected:", { 
+        audioPaused: audio.paused,
+        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      });
+      
       if (!audio.paused) {
-        audio.pause();
-        setIsPlaying(false);
-        console.log("🎵 ⏸️ Music paused - browser closing");
+        try {
+          // Pause the audio
+          audio.pause();
+          // Set volume to 0 for more aggressive stop
+          audio.volume = 0;
+          // Don't call setIsPlaying in beforeunload as state updates might not work during unload
+          console.log("🎵 ⏸️ Music paused - browser closing");
+        } catch (error) {
+          // Ignore errors during unload
+          console.error("Error in beforeunload handler:", error);
+        }
       }
     };
 
-    const handlePageHide = () => {
+    const handlePageHide = (e: PageTransitionEvent) => {
       // Additional event for mobile browsers when page is being unloaded
-      if (!audio.paused) {
-        audio.pause();
-        setIsPlaying(false);
-        console.log("🎵 ⏸️ Music paused - page hiding");
+      // Only stop if page is not being cached (persisted = false means page is being unloaded)
+      const audio = audioRef.current;
+      if (!audio) return;
+      
+      console.log("🔍 Pagehide event detected:", { 
+        persisted: e.persisted, 
+        audioPaused: audio.paused,
+        isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      });
+      
+      if (!e.persisted) {
+        // Page is being unloaded (not cached) - stop music
+        if (!audio.paused) {
+          try {
+            // Pause the audio
+            audio.pause();
+            // Also set volume to 0 for more aggressive stop on mobile
+            audio.volume = 0;
+            // Don't call setIsPlaying in pagehide as state updates might not work during unload
+            console.log("🎵 ⏸️ Music paused - page hiding (mobile browser close)");
+          } catch (error) {
+            // Ignore errors during page hide
+            console.error("Error in pagehide handler:", error);
+          }
+        }
+      } else {
+        // Page is being cached (persisted = true) - might be tab switch on mobile
+        // Still pause if playing, as cached pages shouldn't play audio
+        if (!audio.paused) {
+          try {
+            audio.pause();
+            console.log("🎵 ⏸️ Music paused - page cached (mobile tab switch)");
+          } catch (error) {
+            // Ignore errors
+          }
+        }
       }
     };
 
-    // Add event listeners
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handlePageHide);
+    // Fallback: Handle window blur (when window loses focus)
+    const handleBlur = () => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      
+      // Only pause if tab is actually hidden (not just window lost focus)
+      if (document.hidden || document.visibilityState === 'hidden') {
+        wasPlayingBeforeHidden.current = !audio.paused;
+        if (!audio.paused) {
+          try {
+            audio.pause();
+            setIsPlaying(false);
+            console.log("🎵 ⏸️ Music paused - window blur (fallback)");
+          } catch (error) {
+            console.error("Error pausing audio on blur:", error);
+          }
+        }
+      }
+    };
+
+    // Handle suspend event on audio element (when browser suspends media)
+    const handleSuspend = () => {
+      const audio = audioRef.current;
+      if (audio) {
+        setIsPlaying(false);
+        console.log("🎵 ⏸️ Music suspended by browser");
+      }
+    };
+
+    // Add suspend listener to audio element (will be added when audio exists)
+    const addSuspendListener = () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.addEventListener("suspend", handleSuspend);
+        console.log("✅ Suspend listener added to audio element");
+      }
+    };
+
+    // Try to add suspend listener immediately
+    addSuspendListener();
+    
+    // Also try after a delay in case audio element isn't ready yet
+    const suspendTimer = setTimeout(addSuspendListener, 1000);
+
+    // Add event listeners with capture phase for better reliability
+    // Mobile browsers need special handling with pagehide/pageshow events
+    console.log("✅ Registering visibility change listeners for mobile and desktop");
+    
+    // Primary: visibilitychange (works on desktop and most mobile browsers)
+    document.addEventListener("visibilitychange", handleVisibilityChange, true);
+    
+    // Mobile-specific: pagehide (critical for iOS Safari and Android Chrome when closing/switching)
+    window.addEventListener("pagehide", handlePageHide, true);
+    
+    // Desktop and mobile: beforeunload (browser/tab closing)
+    window.addEventListener("beforeunload", handleBeforeUnload, true);
+    
+    // Fallback: blur (for browsers that don't properly fire visibilitychange)
+    window.addEventListener("blur", handleBlur, true);
+    
+    // Mobile-specific: pageshow (when returning to cached page - prevent auto-resume)
+    const handlePageShow = (e: PageTransitionEvent) => {
+      // If page was cached and we return, don't auto-resume
+      if (e.persisted && wasPlayingBeforeHidden.current) {
+        const audio = audioRef.current;
+        if (audio && !audio.paused) {
+          audio.pause();
+          setIsPlaying(false);
+          console.log("🎵 ⏸️ Music prevented from resuming on cached page return (mobile)");
+        }
+        wasPlayingBeforeHidden.current = false;
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow, true);
+    
+    console.log("✅ All event listeners registered (visibilitychange, pagehide, beforeunload, blur, pageshow)");
 
     // Cleanup
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", handlePageHide);
+      clearTimeout(suspendTimer);
+      const audioForCleanup = audioRef.current;
+      if (audioForCleanup) {
+        audioForCleanup.removeEventListener("suspend", handleSuspend);
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange, true);
+      window.removeEventListener("beforeunload", handleBeforeUnload, true);
+      window.removeEventListener("pagehide", handlePageHide, true);
+      window.removeEventListener("blur", handleBlur, true);
+      window.removeEventListener("pageshow", handlePageShow, true);
+      console.log("🧹 Event listeners cleaned up");
     };
   }, []);
 

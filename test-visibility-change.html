@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Tab Switch Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .status-box {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .status {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .status.playing {
+            background: #4caf50;
+            color: white;
+        }
+        .status.paused {
+            background: #f44336;
+            color: white;
+        }
+        .info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.3);
+            color: white;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        button:hover {
+            background: rgba(255, 255, 255, 0.5);
+            transform: translateY(-2px);
+        }
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .log-entry.success {
+            color: #4caf50;
+        }
+        .log-entry.error {
+            color: #f44336;
+        }
+        .log-entry.info {
+            color: #2196f3;
+        }
+        .instructions {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 Music Tab Switch Test</h1>
+        
+        <div class="instructions">
+            <h3>📋 Test Instructions:</h3>
+            <ol>
+                <li>Click "▶️ Start Music" button below</li>
+                <li>Wait for music to start playing (status will show "Playing")</li>
+                <li><strong>Switch to another browser tab</strong> (or minimize the window)</li>
+                <li>Check the log below - you should see "Music paused - tab switched"</li>
+                <li>Switch back to this tab</li>
+                <li>Music should remain paused (not auto-resume)</li>
+            </ol>
+        </div>
+
+        <div class="status-box">
+            <div>Current Status:</div>
+            <div id="status" class="status paused">Paused</div>
+        </div>
+
+        <div class="info">
+            <div><strong>Audio State:</strong> <span id="audioState">-</span></div>
+            <div><strong>Tab Visibility:</strong> <span id="visibilityState">-</span></div>
+            <div><strong>Current Time:</strong> <span id="currentTime">0.00s</span></div>
+            <div><strong>Duration:</strong> <span id="duration">-</span></div>
+        </div>
+
+        <div class="controls">
+            <button id="playBtn">▶️ Start Music</button>
+            <button id="pauseBtn">⏸️ Pause Music</button>
+            <button id="resetBtn">🔄 Reset Test</button>
+        </div>
+
+        <div class="log-container">
+            <h3>📝 Event Log:</h3>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <audio id="audio" preload="auto">
+        <source src="/music/die with smile.mp3" type="audio/mpeg">
+        <source src="/music/La leçon particulière.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const audio = document.getElementById('audio');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.getElementById('status');
+        const audioState = document.getElementById('audioState');
+        const visibilityState = document.getElementById('visibilityState');
+        const currentTime = document.getElementById('currentTime');
+        const duration = document.getElementById('duration');
+        const log = document.getElementById('log');
+        
+        let wasPlayingBeforeHidden = false;
+
+        function logEvent(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${time}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus() {
+            if (audio.paused) {
+                status.textContent = 'Paused';
+                status.className = 'status paused';
+            } else {
+                status.textContent = 'Playing';
+                status.className = 'status playing';
+            }
+            
+            audioState.textContent = audio.paused ? 'Paused' : 'Playing';
+            visibilityState.textContent = document.hidden ? 'Hidden' : 'Visible';
+            currentTime.textContent = audio.currentTime.toFixed(2) + 's';
+            duration.textContent = audio.duration ? audio.duration.toFixed(2) + 's' : 'Loading...';
+        }
+
+        // Handle visibility change - THIS IS THE KEY FUNCTION
+        function handleVisibilityChange() {
+            console.log("🔍 Visibility change detected:", {
+                hidden: document.hidden,
+                visibilityState: document.visibilityState,
+                audioExists: !!audio,
+                audioPaused: audio.paused
+            });
+            logEvent(`🔍 Visibility change: ${document.hidden ? 'HIDDEN' : 'VISIBLE'}`, 'info');
+
+            if (document.hidden || document.visibilityState === 'hidden') {
+                wasPlayingBeforeHidden = !audio.paused;
+                logEvent(`Tab hidden. Was playing: ${wasPlayingBeforeHidden}`, 'info');
+                
+                if (!audio.paused) {
+                    try {
+                        audio.pause();
+                        logEvent('🎵 ⏸️ Music paused - tab switched or browser minimized', 'success');
+                        updateStatus();
+                    } catch (error) {
+                        logEvent(`❌ Error pausing audio: ${error.message}`, 'error');
+                    }
+                } else {
+                    logEvent('Audio was already paused', 'info');
+                }
+            } else {
+                logEvent(`Tab visible again. Was playing before: ${wasPlayingBeforeHidden}`, 'info');
+                
+                if (wasPlayingBeforeHidden) {
+                    // Check immediately if audio is playing
+                    if (!audio.paused) {
+                        audio.pause();
+                        logEvent('🎵 ⏸️ Music prevented from auto-resuming after tab switch', 'success');
+                        updateStatus();
+                    }
+                    // Also check after a short delay
+                    setTimeout(() => {
+                        if (!audio.paused && wasPlayingBeforeHidden) {
+                            audio.pause();
+                            logEvent('🎵 ⏸️ Music prevented from auto-resuming (delayed check)', 'success');
+                            updateStatus();
+                        }
+                        wasPlayingBeforeHidden = false;
+                    }, 100);
+                }
+            }
+            updateStatus();
+        }
+
+        // Handle play event
+        audio.addEventListener('play', () => {
+            logEvent('▶️ Play event fired', 'info');
+            updateStatus();
+            
+            // Prevent auto-resume after tab switch
+            if (wasPlayingBeforeHidden && !document.hidden && document.visibilityState === 'visible') {
+                audio.pause();
+                logEvent('🎵 ⏸️ Prevented auto-resume in play handler', 'success');
+                wasPlayingBeforeHidden = false;
+                updateStatus();
+            }
+        });
+
+        audio.addEventListener('pause', () => {
+            logEvent('⏸️ Pause event fired', 'info');
+            updateStatus();
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            logEvent('✅ Audio metadata loaded', 'success');
+            updateStatus();
+        });
+
+        audio.addEventListener('error', (e) => {
+            logEvent(`❌ Audio error: ${audio.error ? audio.error.message : 'Unknown error'}`, 'error');
+        });
+
+        // Register event listeners
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        logEvent('✅ Visibility change listener registered', 'success');
+
+        window.addEventListener('beforeunload', () => {
+            if (!audio.paused) {
+                audio.pause();
+                logEvent('🎵 ⏸️ Music paused - browser closing', 'success');
+            }
+        });
+
+        window.addEventListener('pagehide', (e) => {
+            if (!e.persisted && !audio.paused) {
+                audio.pause();
+                logEvent('🎵 ⏸️ Music paused - page hiding', 'success');
+            }
+        });
+
+        // Button handlers
+        playBtn.addEventListener('click', () => {
+            audio.play().then(() => {
+                logEvent('▶️ Music started successfully', 'success');
+            }).catch(err => {
+                logEvent(`❌ Error playing: ${err.message}`, 'error');
+            });
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            audio.pause();
+            logEvent('⏸️ Music paused manually', 'info');
+        });
+
+        resetBtn.addEventListener('click', () => {
+            audio.pause();
+            audio.currentTime = 0;
+            wasPlayingBeforeHidden = false;
+            log.innerHTML = '';
+            logEvent('🔄 Test reset', 'info');
+            updateStatus();
+        });
+
+        // Update status periodically
+        setInterval(updateStatus, 100);
+
+        // Initial status
+        updateStatus();
+        logEvent('✅ Test page loaded and ready', 'success');
+        logEvent('👆 Click "Start Music" to begin test', 'info');
+    </script>
+</body>
+</html>
+

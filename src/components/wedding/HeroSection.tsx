@@ -16,7 +16,7 @@ const HeroSection = () => {
   });
 
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-20 md:py-24 overflow-hidden gradient-hero">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16 sm:py-20 md:py-24 overflow-hidden">
       {/* Language Switcher - Mobile Only (visible on home page) */}
       <div className="fixed top-20 right-4 z-50 md:hidden">
         <motion.div
@@ -41,8 +41,7 @@ const HeroSection = () => {
       <div className="absolute inset-4 md:inset-10 border border-gold/20 rounded-lg pointer-events-none" />
       <div className="absolute inset-6 md:inset-12 border border-gold/10 rounded-lg pointer-events-none" />
       
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/20 pointer-events-none" />
+      {/* Subtle gradient overlay - removed to show body background */}
 
       <div className="relative z-10 text-center max-w-4xl mx-auto px-4 sm:px-6">
         <motion.p

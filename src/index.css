@@ -45,7 +45,7 @@
 
     /* Mint sage muted */
     --muted: 150 25% 92%;
-    --muted-foreground: 340 10% 45%;
+    --muted-foreground: 340 15% 35%;
 
     --destructive: 0 70% 65%;
     --destructive-foreground: 0 0% 100%;
@@ -135,12 +135,12 @@
   body {
     @apply text-foreground;
     font-family: var(--font-body);
-    /* Very faded background image */
+    /* Very faded background image - more faded for better text readability */
     background-image: 
       linear-gradient(hsl(var(--background) / 0.88), hsl(var(--background) / 0.88)),
       url('/background.png');
     background-size: cover;
-    background-position: center;
+    background-position: center top;
     background-repeat: no-repeat;
     background-attachment: fixed;
     background-color: hsl(var(--background));
