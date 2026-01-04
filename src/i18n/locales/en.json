@@ -37,6 +37,7 @@
     "successMessage": "Your RSVP has been received. We can't wait to celebrate with you!",
     "attendingMessage": "We can't wait to celebrate with you!",
     "notAttendingMessage": "We're sorry you can't make it. Thank you for letting us know!",
+    "thankYouMessage": "A peaceful night's sleep for children.",
     "error": "Couldn't save RSVP",
     "errorMessage": "We couldn't save your RSVP. Please try again.",
     "formIncomplete": "Please complete the form",

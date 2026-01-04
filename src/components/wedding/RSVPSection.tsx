@@ -290,6 +290,14 @@ const RSVPSection = () => {
               ? t("rsvp.attendingMessage")
               : t("rsvp.notAttendingMessage")}
           </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="text-xl md:text-2xl font-body text-gold font-semibold mt-6 md:mt-8"
+          >
+            {t("rsvp.thankYouMessage")}
+          </motion.p>
         </div>
       </section>
     );
