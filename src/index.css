@@ -146,6 +146,22 @@
     background-color: hsl(var(--background));
   }
 
+  /* Desktop view - specify which part of the background image to show */
+  @media (min-width: 768px) {
+    body {
+      /* Adjust these values to show different parts of the image:
+       * Horizontal: left (0%), center (50%), right (100%), or specific % (e.g., 30%)
+       * Vertical: top (0%), center (50%), bottom (100%), or specific % (e.g., 20%)
+       * Examples:
+       * - "center top" or "50% 0%" - shows top center
+       - "center center" or "50% 50%" - shows center
+       * - "center bottom" or "50% 100%" - shows bottom center
+       * - "30% 20%" - shows custom position (30% from left, 20% from top)
+       */
+      background-position: 60% 30%;
+    }
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
   }

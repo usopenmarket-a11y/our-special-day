@@ -15,6 +15,7 @@
     "test-background": "node scripts/test-background-puppeteer.js",
     "test-music-controls": "node scripts/test-music-controls.js",
     "test-music": "node scripts/start-and-test-music.js",
+    "test-music-tab-visibility": "node scripts/test-music-tab-visibility.js",
     "test-upload-files": "node scripts/test-upload-files.js",
     "test-upload-trace": "node scripts/test-upload-trace.js",
     "lint": "eslint .",

@@ -145,21 +145,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     };
 
     const handlePlay = () => {
-      // Only prevent auto-resume if:
-      // 1. Music was paused due to tab switch (wasPlayingBeforeHidden is true)
-      // 2. Tab is visible (not hidden)
-      // 3. This appears to be an auto-resume (not user-initiated)
-      // We check if wasPlayingBeforeHidden is still true - if user clicked play, it would have been reset in togglePlay
-      if (wasPlayingBeforeHidden.current && !document.hidden && document.visibilityState === 'visible') {
-        // This is likely an auto-resume attempt, prevent it
-        audio.pause();
-        setIsPlaying(false);
-        wasPlayingBeforeHidden.current = false; // Reset flag
-        console.log("🎵 ⏸️ Prevented auto-resume after tab switch");
-        return;
-      }
-      
-      // This is a legitimate play (either user-initiated or autoplay)
+      // This is a legitimate play (either user-initiated or autoplay/resume)
       // Reset the flag since we're playing now
       wasPlayingBeforeHidden.current = false;
       
@@ -422,24 +408,42 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
           console.log("🔍 Hiding prompt - tab became visible again");
         }
         
-        // Prevent auto-resume - check immediately and also set up a delayed check
-        if (wasPlayingBeforeHidden.current) {
-          // Check immediately if audio is playing
-          if (!audio.paused) {
-            audio.pause();
-            setIsPlaying(false);
-            console.log("🎵 ⏸️ Music prevented from auto-resuming after tab switch");
-          }
-          // Also check after a short delay in case autoplay kicks in
-          setTimeout(() => {
+        // Resume music if it was playing before tab was hidden
+        if (wasPlayingBeforeHidden.current && hasUserInteracted.current) {
+          // Only resume if user had interacted with music before
+          const resumeMusic = async () => {
             const audioCheck = audioRef.current;
-            if (audioCheck && !audioCheck.paused && wasPlayingBeforeHidden.current) {
-              audioCheck.pause();
-              setIsPlaying(false);
-              console.log("🎵 ⏸️ Music prevented from auto-resuming (delayed check)");
+            if (audioCheck && audioCheck.paused) {
+              try {
+                // Unmute if it was muted for autoplay
+                if (audioCheck.muted && startMuted) {
+                  audioCheck.muted = false;
+                  setStartMuted(false);
+                  setIsMuted(false);
+                }
+                // Check if audio is ready to play
+                if (audioCheck.readyState < 2) {
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                await audioCheck.play();
+                setIsPlaying(true);
+                console.log("🎵 ▶️ Music resumed after tab became visible");
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                if (!errorMessage.includes('play()') && !errorMessage.includes('interaction')) {
+                  console.error("Failed to resume audio:", error);
+                }
+                // If resume fails, don't show error - just log it
+              }
             }
             wasPlayingBeforeHidden.current = false;
-          }, 100);
+          };
+          
+          // Try to resume after a short delay to ensure page is fully visible
+          setTimeout(resumeMusic, 200);
+        } else {
+          // Reset flag if we're not resuming
+          wasPlayingBeforeHidden.current = false;
         }
       }
     };
@@ -571,15 +575,33 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // Fallback: blur (for browsers that don't properly fire visibilitychange)
     window.addEventListener("blur", handleBlur, true);
     
-    // Mobile-specific: pageshow (when returning to cached page - prevent auto-resume)
+    // Mobile-specific: pageshow (when returning to cached page - resume if was playing)
     const handlePageShow = (e: PageTransitionEvent) => {
-      // If page was cached and we return, don't auto-resume
-      if (e.persisted && wasPlayingBeforeHidden.current) {
+      // If page was cached and we return, resume if music was playing before
+      if (e.persisted && wasPlayingBeforeHidden.current && hasUserInteracted.current) {
         const audio = audioRef.current;
-        if (audio && !audio.paused) {
-          audio.pause();
-          setIsPlaying(false);
-          console.log("🎵 ⏸️ Music prevented from resuming on cached page return (mobile)");
+        if (audio && audio.paused) {
+          const resumeMusic = async () => {
+            try {
+              if (audio.muted && startMuted) {
+                audio.muted = false;
+                setStartMuted(false);
+                setIsMuted(false);
+              }
+              if (audio.readyState < 2) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+              await audio.play();
+              setIsPlaying(true);
+              console.log("🎵 ▶️ Music resumed on cached page return (mobile)");
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              if (!errorMessage.includes('play()') && !errorMessage.includes('interaction')) {
+                console.error("Failed to resume audio on pageshow:", error);
+              }
+            }
+          };
+          setTimeout(resumeMusic, 200);
         }
         wasPlayingBeforeHidden.current = false;
       }
