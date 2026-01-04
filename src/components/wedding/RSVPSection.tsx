@@ -255,7 +255,7 @@ const RSVPSection = () => {
 
   if (isSubmitted) {
     return (
-      <section id="rsvp" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 bg-secondary/30 relative overflow-hidden">
+      <section id="rsvp" className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-0 left-0 w-96 h-96 bg-rose/5 rounded-full blur-3xl" />
