@@ -13,6 +13,7 @@
     "test-audio": "node scripts/test-audio-puppeteer.js",
     "test-rsvp": "node scripts/test-rsvp-puppeteer.js",
     "test-background": "node scripts/test-background-puppeteer.js",
+    "test-background-trace": "node scripts/test-background-trace-mobile.js",
     "test-music-controls": "node scripts/test-music-controls.js",
     "test-music": "node scripts/start-and-test-music.js",
     "test-music-tab-visibility": "node scripts/test-music-tab-visibility.js",
