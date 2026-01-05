@@ -124,7 +124,7 @@ serve(async (req) => {
     const body = await req.json();
     
     // Support both single guest (backward compatible) and multiple guests
-    const guests = body.guests || (body.guestName ? [{ name: body.guestName, rowIndex: body.rowIndex }] : []);
+    const guests = body.guests || (body.guestName ? [{ englishName: body.guestName || body.name, rowIndex: body.rowIndex }] : []);
     const attending = body.attending;
     
     // Get sheet ID from environment variable (stored in Supabase secrets)
@@ -135,15 +135,26 @@ serve(async (req) => {
 
     console.log(`Saving RSVP for ${guests.length} guest(s), attending: ${attending}`);
     guests.forEach((g, i) => {
-      console.log(`  Guest ${i + 1}: ${g.name} (rowIndex: ${g.rowIndex})`);
+      console.log(`  Guest ${i + 1}: ${g.englishName || g.name} (rowIndex: ${g.rowIndex})`);
     });
 
     const now = new Date();
-    const date = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    // Format date as MM/DD/YYYY to match Google Sheets format
+    const date = now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+    // Format time as HH:MM (24-hour format)
+    const time = now.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: false 
+    });
     const confirmationText = attending ? 'Yes, Attending' : 'Regretfully Decline';
     
-    console.log(`Confirmation: ${confirmationText}, Date: ${date}, Time: ${time}`);
+    console.log(`RSVP Data - Confirmation: "${confirmationText}", Date: "${date}", Time: "${time}"`);
+    console.log(`Sheet structure: A=English Name, B=Arabic Name, C=Family Group, D=Confirmation, E=Table number, F=Date, G=Time`);
 
     // Obtain service account token with Sheets scope
     const token = await getAccessToken('https://www.googleapis.com/auth/spreadsheets');
@@ -160,18 +171,43 @@ serve(async (req) => {
       const actualRow = guest.rowIndex + 2;
       
       // Google Sheets column structure:
-      // Column A: Name (not updated)
-      // Column B: Family Group (not updated)
-      // Column C: Confirmation (updated)
-      // Column D: Date (updated)
-      // Column E: Time (updated)
-      const range = `Sheet1!C${actualRow}:E${actualRow}`;
-      const values = [[confirmationText, date, time]]; // [Confirmation, Date, Time]
+      // Column A (index 0): English Name (not updated)
+      // Column B (index 1): Arabic Name (not updated)
+      // Column C (index 2): Family Group (not updated)
+      // Column D (index 3): Confirmation (updated)
+      // Column E (index 4): Table number (not updated - manually assigned)
+      // Column F (index 5): Date (updated)
+      // Column G (index 6): Time (updated)
+      // 
+      // We need to update D, F, G separately since E (Table number) is in between
+      // Use individual cell updates to avoid shifting data
       
-      console.log(`Preparing update for ${guest.name}: Range=${range}, Values=${JSON.stringify(values)}`);
+      console.log(`Preparing update for ${guest.englishName || guest.name}: Row=${actualRow}, Confirmation=${confirmationText}, Date=${date}, Time=${time}`);
+      console.log(`  Column mapping: D=Confirmation, F=Date, G=Time`);
+      console.log(`  Writing to: Sheet1!D${actualRow} (Confirmation), Sheet1!F${actualRow} (Date), Sheet1!G${actualRow} (Time)`);
       
-      updates.push({ range, values });
-      guestNames.push(guest.name);
+      // Update Confirmation (Column D, index 3) - single cell
+      // IMPORTANT: Column D is the 4th column (A=0, B=1, C=2, D=3)
+      updates.push({
+        range: `Sheet1!D${actualRow}`,
+        values: [[confirmationText]]
+      });
+      
+      // Update Date (Column F, index 5) - single cell
+      // IMPORTANT: Column F is the 6th column (A=0, B=1, C=2, D=3, E=4, F=5)
+      updates.push({
+        range: `Sheet1!F${actualRow}`,
+        values: [[date]]
+      });
+      
+      // Update Time (Column G, index 6) - single cell
+      // IMPORTANT: Column G is the 7th column (A=0, B=1, C=2, D=3, E=4, F=5, G=6)
+      updates.push({
+        range: `Sheet1!G${actualRow}`,
+        values: [[time]]
+      });
+      
+      guestNames.push(guest.englishName || guest.name);
     }
 
     // Use batchUpdate for multiple rows (more efficient)
@@ -198,16 +234,30 @@ serve(async (req) => {
       // Multiple updates - use batchUpdate
       const batchUpdateUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchUpdate`;
       
+      // Log the updates for debugging
+      console.log(`Batch updating ${updates.length} cells:`);
+      updates.forEach((update, idx) => {
+        console.log(`  ${idx + 1}. Range: ${update.range}, Values: ${JSON.stringify(update.values)}`);
+      });
+      
+      const batchData = {
+        valueInputOption: 'USER_ENTERED',
+        data: updates.map(({ range, values }) => ({ 
+          range: range,
+          values: values,
+          majorDimension: 'ROWS'
+        })),
+      };
+      
+      console.log('Batch update payload:', JSON.stringify(batchData, null, 2));
+      
       const response = await fetch(batchUpdateUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          valueInputOption: 'USER_ENTERED',
-          data: updates.map(({ range, values }) => ({ range, values })),
-        }),
+        body: JSON.stringify(batchData),
       });
 
       if (!response.ok) {
@@ -215,6 +265,9 @@ serve(async (req) => {
         console.error('Google Sheets API error:', errorText);
         return new Response(JSON.stringify({ success: false, error: 'Failed to save RSVP to Google Sheets', note: errorText, guestNames, attending, date, time }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      
+      const responseData = await response.json();
+      console.log('Batch update response:', JSON.stringify(responseData, null, 2));
     }
 
     console.log(`RSVP saved successfully for ${guests.length} guest(s)`);

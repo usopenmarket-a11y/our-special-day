@@ -13,9 +13,11 @@ import { useTranslation } from "react-i18next";
 import { toArabicNumerals } from "@/lib/arabicNumbers";
 
 interface GuestInfo {
-  name: string;
+  englishName: string;
+  arabicName?: string;
   rowIndex: number;
   familyGroup?: string;
+  tableNumber?: string;
 }
 
 // Rate limiting: 5 searches per day
@@ -64,7 +66,10 @@ const RSVPSection = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedAttendance, setSubmittedAttendance] = useState<"attending" | "not-attending" | "">("");
+  const [submittedTableNumbers, setSubmittedTableNumbers] = useState<string[]>([]);
+  const [submittedGuestsWithTables, setSubmittedGuestsWithTables] = useState<Array<{ name: string; tableNumber: string }>>([]);
   const [searchCount, setSearchCount] = useState(getSearchCount().count);
+  const [searchLanguage, setSearchLanguage] = useState<'en' | 'ar'>('en');
   const { toast } = useToast();
 
   // Fetch guests function (called on button click)
@@ -96,6 +101,12 @@ const RSVPSection = () => {
 
       if (error) {
         console.error("Error fetching guests:", error);
+        console.error("Error details:", {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          stack: error.stack
+        });
         setGuests([]);
         
         // Check if it's a rate limit error from backend
@@ -103,6 +114,12 @@ const RSVPSection = () => {
           toast({
             title: t("rsvp.searchLimitReached"),
             description: t("rsvp.searchLimitMessage"),
+            variant: "destructive",
+          });
+        } else if (error.message?.includes('503') || error.message?.includes('BOOT_ERROR') || error.message?.includes('failed to start')) {
+          toast({
+            title: t("rsvp.error"),
+            description: "The search service is temporarily unavailable. Please try again in a moment.",
             variant: "destructive",
           });
         } else {
@@ -125,12 +142,53 @@ const RSVPSection = () => {
         return;
       }
 
-      const fetchedGuests = data?.guests || [];
-      console.log(`Fetched ${fetchedGuests.length} guests for query "${searchQuery}"`);
-      fetchedGuests.forEach((g: GuestInfo, i: number) => {
-        console.log(`  ${i + 1}. ${g.name} (Family: ${g.familyGroup || 'None'}, rowIndex: ${g.rowIndex})`);
+      let fetchedGuests = data?.guests || [];
+      
+      // Handle both old and new API formats for backward compatibility
+      // Old format: { name, rowIndex, familyGroup }
+      // New format: { englishName, arabicName, rowIndex, familyGroup, tableNumber }
+      fetchedGuests = fetchedGuests.map((g: any) => {
+        // If old format (has 'name' but no 'englishName'), convert it
+        if (g.name && !g.englishName) {
+          console.warn('Converting old API format to new format for guest:', g.name);
+          return {
+            englishName: g.name,
+            arabicName: g.arabicName || undefined,
+            rowIndex: g.rowIndex,
+            familyGroup: g.familyGroup || undefined,
+            tableNumber: g.tableNumber || undefined
+          };
+        }
+        // Already in new format or missing required fields
+        return {
+          englishName: g.englishName || g.name || 'Unknown',
+          arabicName: g.arabicName || undefined,
+          rowIndex: g.rowIndex,
+          familyGroup: g.familyGroup || undefined,
+          tableNumber: g.tableNumber || undefined
+        };
       });
+      
+      // Detect language from search query - check if it contains Arabic characters
+      const hasArabicChars = /[\u0600-\u06FF]/.test(searchQuery);
+      const detectedLanguage = data?.searchLanguage || (hasArabicChars ? 'ar' : 'en');
+      
+      console.log(`Fetched ${fetchedGuests.length} guests for query "${searchQuery}" (language: ${detectedLanguage}, hasArabicChars: ${hasArabicChars})`);
+      fetchedGuests.forEach((g: GuestInfo, i: number) => {
+        console.log(`  ${i + 1}. English: "${g.englishName}", Arabic: "${g.arabicName || 'N/A'}", Family: "${g.familyGroup || 'None'}", Table: "${g.tableNumber || 'None'}", rowIndex: ${g.rowIndex}`);
+      });
+      
+      // Validate that we have the correct data structure
+      const invalidGuests = fetchedGuests.filter((g: GuestInfo) => !g.englishName);
+      if (invalidGuests.length > 0) {
+        console.warn(`Warning: Found ${invalidGuests.length} guests without englishName`);
+      }
+      
       setGuests(fetchedGuests);
+      setSearchLanguage(detectedLanguage);
+      
+      // Clear selected guests when performing a new search to avoid confusion
+      setSelectedGuests([]);
       
       // Increment search count
       const newCount = incrementSearchCount();
@@ -150,9 +208,9 @@ const RSVPSection = () => {
 
   const toggleGuestSelection = (guest: GuestInfo) => {
     setSelectedGuests(prev => {
-      const isSelected = prev.some(g => g.name === guest.name && g.rowIndex === guest.rowIndex);
+      const isSelected = prev.some(g => g.englishName === guest.englishName && g.rowIndex === guest.rowIndex);
       if (isSelected) {
-        return prev.filter(g => !(g.name === guest.name && g.rowIndex === guest.rowIndex));
+        return prev.filter(g => !(g.englishName === guest.englishName && g.rowIndex === guest.rowIndex));
       } else {
         return [...prev, guest];
       }
@@ -162,8 +220,8 @@ const RSVPSection = () => {
   const selectAllInFamily = (familyGroup: string) => {
     const familyMembers = guests.filter(g => g.familyGroup === familyGroup);
     setSelectedGuests(prev => {
-      const existingNames = new Set(prev.map(g => `${g.name}-${g.rowIndex}`));
-      const newMembers = familyMembers.filter(g => !existingNames.has(`${g.name}-${g.rowIndex}`));
+      const existingKeys = new Set(prev.map(g => `${g.englishName}-${g.rowIndex}`));
+      const newMembers = familyMembers.filter(g => !existingKeys.has(`${g.englishName}-${g.rowIndex}`));
       return [...prev, ...newMembers];
     });
   };
@@ -173,7 +231,35 @@ const RSVPSection = () => {
   };
 
   const isGuestSelected = (guest: GuestInfo) => {
-    return selectedGuests.some(g => g.name === guest.name && g.rowIndex === guest.rowIndex);
+    return selectedGuests.some(g => g.englishName === guest.englishName && g.rowIndex === guest.rowIndex);
+  };
+  
+  // Get display name based on search language
+  // Rules:
+  // - If searching in Arabic (searchLanguage === 'ar') AND Arabic name exists → show Arabic name
+  // - Otherwise → always show English name
+  // - Family group names always stay in English (handled separately)
+  const getDisplayName = (guest: GuestInfo): string => {
+    // Always default to English name if available
+    if (!guest.englishName) {
+      console.warn('Guest missing englishName:', guest);
+      return guest.arabicName || 'Unknown';
+    }
+    
+    // If searching in Arabic AND Arabic name exists and is not empty, show Arabic name
+    // Otherwise, always show English name
+    const shouldShowArabic = searchLanguage === 'ar' && 
+                             guest.arabicName && 
+                             guest.arabicName.trim().length > 0;
+    
+    const displayName = shouldShowArabic ? guest.arabicName : guest.englishName;
+    
+    // Debug log for troubleshooting
+    if (guest.englishName?.toLowerCase().includes('sarah') || guest.englishName?.toLowerCase().includes('hossni')) {
+      console.log(`getDisplayName: englishName="${guest.englishName}", arabicName="${guest.arabicName || 'N/A'}", searchLanguage=${searchLanguage}, shouldShowArabic=${shouldShowArabic}, returning="${displayName}"`);
+    }
+    
+    return displayName;
   };
 
   const areAllFamilySelected = (familyGroup: string) => {
@@ -202,7 +288,7 @@ const RSVPSection = () => {
       // Save RSVP to Google Sheet for all selected guests
       const { data, error } = await supabase.functions.invoke('save-rsvp', {
         body: {
-          guests: selectedGuests.map(g => ({ name: g.name, rowIndex: g.rowIndex })),
+          guests: selectedGuests.map(g => ({ englishName: g.englishName, rowIndex: g.rowIndex })),
           attending: attendance === "attending",
         },
       });
@@ -233,8 +319,56 @@ const RSVPSection = () => {
         return;
       }
 
+      // Collect table numbers for attending guests
+      // Important: Make sure we're getting table numbers from the original guest data
+      // Find the full guest info from the guests list to ensure we have table numbers
+      const guestsWithTableNumbers = selectedGuests.map(selectedGuest => {
+        // Find the full guest info from the guests list
+        const fullGuest = guests.find(g => 
+          g.englishName === selectedGuest.englishName && 
+          g.rowIndex === selectedGuest.rowIndex
+        );
+        return fullGuest || selectedGuest;
+      });
+      
+      console.log('Selected guests for RSVP:', guestsWithTableNumbers.map(g => ({
+        englishName: g.englishName,
+        tableNumber: g.tableNumber,
+        rowIndex: g.rowIndex
+      })));
+      
+      const tableNumbers = attendance === "attending" 
+        ? guestsWithTableNumbers
+            .map(g => g.tableNumber)
+            .filter((table): table is string => !!table && table.trim().length > 0)
+        : [];
+      
+      // Store guests with their table numbers for display
+      // Use the current search language to determine which name to show
+      const guestsWithTables = attendance === "attending"
+        ? guestsWithTableNumbers
+            .filter(g => g.tableNumber && g.tableNumber.trim().length > 0)
+            .map(g => {
+              // Determine display name based on search language
+              const displayName = (searchLanguage === 'ar' && g.arabicName && g.arabicName.trim().length > 0)
+                ? g.arabicName
+                : (g.englishName || g.arabicName || 'Unknown');
+              return {
+                name: displayName,
+                tableNumber: g.tableNumber!
+              };
+            })
+        : [];
+      
+      console.log('Table numbers collected:', tableNumbers);
+      console.log('Guests with tables:', guestsWithTables);
+      console.log('Attendance:', attendance);
+      console.log('All selected guests have table numbers:', guestsWithTableNumbers.every(g => g.tableNumber));
+      
       setIsSubmitted(true);
       setSubmittedAttendance(attendance);
+      setSubmittedTableNumbers(tableNumbers);
+      setSubmittedGuestsWithTables(guestsWithTables);
       toast({
         title: t("rsvp.success"),
         description: attendance === "attending" 
@@ -298,6 +432,20 @@ const RSVPSection = () => {
           >
             {t("rsvp.thankYouMessage")}
           </motion.p>
+          {submittedAttendance === "attending" && submittedGuestsWithTables.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8 }}
+              className="text-lg md:text-xl font-body text-foreground mt-4 md:mt-6 space-y-2"
+            >
+              {submittedGuestsWithTables.map((guest, idx) => (
+                <p key={idx} className="text-lg md:text-xl font-body text-foreground">
+                  <span className="font-semibold">{guest.name}</span> {t("rsvp.tableNumberIs")}: <span className="font-semibold text-gold">{toArabicNumerals(guest.tableNumber, isArabic)}</span>
+                </p>
+              ))}
+            </motion.div>
+          )}
         </div>
       </section>
     );
@@ -353,7 +501,11 @@ const RSVPSection = () => {
                   <Label className="text-sm md:text-base font-display">{t("rsvp.selectName")}</Label>
                   {searchCount > 0 && (
                     <span className="text-xs text-muted-foreground font-body">
-                      {t("rsvp.searchesRemaining", { count: toArabicNumerals(getRemainingSearches(), isArabic) })}
+                      {(() => {
+                        const remaining = getRemainingSearches();
+                        const translated = t("rsvp.searchesRemaining", { count: remaining });
+                        return isArabic ? translated.replace(/\d+/g, (num) => toArabicNumerals(parseInt(num, 10), true)) : translated;
+                      })()}
                     </span>
                   )}
                 </div>
@@ -445,7 +597,7 @@ const RSVPSection = () => {
                                 const isSelected = isGuestSelected(guest);
                                 return (
                                   <label
-                                    key={`${guest.name}-${index}`}
+                                    key={`${guest.englishName}-${index}`}
                                     className={`flex items-center gap-3 p-3 md:p-2 rounded-md cursor-pointer transition-colors touch-manipulation active:scale-[0.98] min-h-[44px] ${
                                       isSelected
                                         ? "bg-gold/10 border border-gold/30"
@@ -459,7 +611,7 @@ const RSVPSection = () => {
                                         className="w-6 h-6 md:w-5 md:h-5"
                                       />
                                     </div>
-                                    <span className="font-body text-sm md:text-base text-foreground flex-1">{guest.name}</span>
+                                    <span className="font-body text-sm md:text-base text-foreground flex-1">{getDisplayName(guest)}</span>
                                   </label>
                                 );
                               })}
@@ -473,7 +625,7 @@ const RSVPSection = () => {
                         const isSelected = isGuestSelected(guest);
                         result.push(
                           <label
-                            key={`${guest.name}-${index}`}
+                            key={`${guest.englishName}-${index}`}
                             className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors min-h-[44px] ${
                               isSelected
                                 ? "bg-gold/10 border border-gold/30"
@@ -487,7 +639,7 @@ const RSVPSection = () => {
                                 className="w-6 h-6"
                               />
                             </div>
-                            <span className="font-body text-foreground flex-1">{guest.name}</span>
+                            <span className="font-body text-foreground flex-1">{getDisplayName(guest)}</span>
                           </label>
                         );
                       });
@@ -514,15 +666,15 @@ const RSVPSection = () => {
                     <div className="flex flex-wrap gap-2">
                       {selectedGuests.map((guest, index) => (
                         <div
-                          key={`${guest.name}-${index}`}
+                          key={`${guest.englishName}-${index}`}
                           className="flex items-center gap-1 px-3 py-1.5 md:px-3 md:py-2 bg-gold/20 rounded-md text-sm md:text-base touch-manipulation"
                         >
-                          <span className="font-body text-foreground">{guest.name}</span>
+                          <span className="font-body text-foreground">{getDisplayName(guest)}</span>
                           <button
                             type="button"
                             onClick={() => toggleGuestSelection(guest)}
                             className="text-muted-foreground hover:text-foreground ml-1 p-1 -mr-1 touch-manipulation"
-                            aria-label={`Remove ${guest.name}`}
+                            aria-label={`Remove ${getDisplayName(guest)}`}
                           >
                             <X className="w-4 h-4 md:w-4 md:h-4" />
                           </button>

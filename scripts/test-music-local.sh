@@ -14,3 +14,4 @@ npm run test-music-tab-visibility
 echo "🛑 Stopping dev server..."
 kill $DEV_PID 2>/dev/null
 
+

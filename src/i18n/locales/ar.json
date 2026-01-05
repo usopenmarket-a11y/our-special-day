@@ -53,7 +53,9 @@
     "searchLimitReached": "تم الوصول إلى حد البحث",
     "searchLimitMessage": "لقد وصلت إلى الحد اليومي للبحث (5 مرات). يرجى المحاولة مرة أخرى غداً.",
     "searchesRemaining": "{{count}} عمليات بحث متبقية اليوم",
-    "searchError": "فشل البحث. يرجى المحاولة مرة أخرى."
+    "searchError": "فشل البحث. يرجى المحاولة مرة أخرى.",
+    "tableNumberLabel": "رقم طاولتك",
+    "tableNumberIs": "رقم الطاولة هو"
   },
   "details": {
     "joinUs": "انضم إلينا",

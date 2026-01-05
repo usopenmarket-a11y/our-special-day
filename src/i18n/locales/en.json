@@ -53,7 +53,9 @@
     "searchLimitReached": "Search limit reached",
     "searchLimitMessage": "You have reached the daily search limit of 5 searches. Please try again tomorrow.",
     "searchesRemaining": "{{count}} searches remaining today",
-    "searchError": "Failed to search. Please try again."
+    "searchError": "Failed to search. Please try again.",
+    "tableNumberLabel": "Your table number",
+    "tableNumberIs": "table number is"
   },
   "details": {
     "joinUs": "Join Us",

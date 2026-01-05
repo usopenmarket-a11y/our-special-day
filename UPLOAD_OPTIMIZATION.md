@@ -107,3 +107,4 @@ targetSize: 2MB
 - **Quality**: Visually identical to original
 - **Progress**: See multiple uploads progress simultaneously
 
+
