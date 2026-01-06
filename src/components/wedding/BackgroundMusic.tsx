@@ -137,7 +137,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     }
 
     // Prevent multiple simultaneous loads - check multiple conditions
-    const now = Date.now();
+    // Reuse 'now' from above, no need to redeclare
     const timeSinceLastLoad = now - lastLoadTimeRef.current;
     const timeSinceGlobalLock = now - globalLoadLock.lockTime;
     const timeSinceLastLoadCall = now - lastLoadCallRef.current;
@@ -173,8 +173,8 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     }
     
     // Final check: if audio element already has the correct source loaded
-    const currentSrc = audio.currentSrc || '';
-    if (currentSrc && currentSrc.includes(encodeURIComponent(currentSong.split('/').pop() || '')) && audio.readyState > 0 && !audio.error) {
+    const audioCurrentSrcCheck = audio.currentSrc || '';
+    if (audioCurrentSrcCheck && audioCurrentSrcCheck.includes(encodeURIComponent(currentSong.split('/').pop() || '')) && audio.readyState > 0 && !audio.error) {
       console.log("🔍 Audio element already has correct source, skipping");
       lastLoadedSongRef.current = currentSong;
       lastLoadTimeRef.current = now;
@@ -382,11 +382,11 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // Note: handleError is already added above with audio.addEventListener("error", handleError)
     
     // Only load if the source has actually changed
-    const currentSrc = audio.currentSrc || '';
+    const audioCurrentSrc = audio.currentSrc || '';
     const encodedFilenameCheck = encodeURIComponent(filename);
     
     // Check if we're already loading/loaded this exact file
-    if (currentSrc && currentSrc.includes(encodedFilenameCheck) && audio.readyState > 0 && !audio.error) {
+    if (audioCurrentSrc && audioCurrentSrc.includes(encodedFilenameCheck) && audio.readyState > 0 && !audio.error) {
       console.log("🔍 Audio source unchanged and ready, skipping load()");
       isLoadingRef.current = false;
       globalLoadLock.isLocked = false;
@@ -395,8 +395,7 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     }
     
     // Debounce the load call to prevent rapid successive loads
-    const now = Date.now();
-    const timeSinceLastLoadCall = now - lastLoadCallRef.current;
+    // Reuse timeSinceLastLoadCall from above, no need to redeclare
     
     // AGGRESSIVE: If we called load() very recently (within 200ms), skip entirely
     if (timeSinceLastLoadCall < 200) {
