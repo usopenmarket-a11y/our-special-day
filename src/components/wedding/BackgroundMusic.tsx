@@ -1,9 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { Volume2, VolumeX, AlertCircle, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import { toArabicNumerals } from "@/lib/arabicNumbers";
+
+// Global lock to prevent multiple simultaneous loads across all instances
+const globalLoadLock = {
+  isLocked: false,
+  currentSong: null as string | null,
+  lockTime: 0,
+};
 
 interface BackgroundMusicProps {
   src: string | string[]; // Support both single URL and playlist
@@ -26,6 +33,15 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
   const wasPlayingBeforeHidden = useRef<boolean>(false); // Track if music was playing before tab was hidden
   const hasUserInteracted = useRef<boolean>(false); // Track if user has already interacted with music
   const showPromptRef = useRef<boolean>(false); // Track prompt state for use in event handlers
+  const isLoadingRef = useRef<boolean>(false); // Track if audio is currently loading to prevent multiple loads
+  const lastLoadedSongRef = useRef<string | null>(null); // Track the last loaded song to prevent reloading the same song
+  const startMutedRef = useRef<boolean>(true); // Track startMuted in a ref to avoid callback dependencies
+  const lastLoadTimeRef = useRef<number>(0); // Track when we last loaded to prevent rapid re-loads
+  const isMountedRef = useRef<boolean>(true); // Track if component is mounted
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null); // For debouncing loads
+  const lastLoadCallRef = useRef<number>(0); // Track when we last called audio.load()
+  const loadCallCountRef = useRef<number>(0); // Track how many times we've tried to load
+  const lastSourceRef = useRef<string | null>(null); // Track the last source we set to prevent unnecessary updates
 
   // Initialize playlist
   useEffect(() => {
@@ -40,12 +56,14 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     setPlaylist(processedPlaylist);
     setCurrentSongIndex(0);
     setStartMuted(true); // Reset to muted when playlist changes
+    startMutedRef.current = true; // Also update ref
   }, [src, shuffle]);
 
   const currentSong = playlist[currentSongIndex];
 
   // Play on first user interaction if auto-play was blocked
   // This function is used by both the prompt overlay and event listeners
+  // Using refs to avoid dependency issues that cause re-renders
   const handleFirstInteraction = useCallback(async () => {
     const audio = audioRef.current;
     if (audio && audio.paused) {
@@ -55,10 +73,12 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         hasUserInteracted.current = true; // Mark that user has interacted
         
         // Unmute before playing (in case it was muted for autoplay)
-        if (audio.muted && startMuted) {
+        // Use ref to avoid dependency on startMuted state
+        if (audio.muted && startMutedRef.current) {
           audio.muted = false;
           setStartMuted(false);
           setIsMuted(false);
+          startMutedRef.current = false;
         }
         // Check if audio is ready to play
         if (audio.readyState < 2) {
@@ -79,20 +99,105 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         setError("Could not play audio. Browser may require user interaction.");
       }
     }
-  }, [startMuted]);
+  }, []); // Empty deps - use refs instead to avoid re-renders
 
+  // Separate effect for volume/mute changes (doesn't require reloading audio)
   useEffect(() => {
-    if (type === "anghami" || !currentSong) return;
+    const audio = audioRef.current;
+    if (!audio || type === "anghami" || !currentSong) return;
+    
+    // Update volume and mute state without reloading
+    if (startMuted) {
+      audio.muted = true;
+    }
+    audio.volume = isMuted ? 0 : volume;
+  }, [volume, isMuted, startMuted, type, currentSong]);
+
+  // Main effect for loading audio - only runs when song changes
+  useEffect(() => {
+    if (type === "anghami" || !currentSong || !isMountedRef.current) return;
+
+    // ULTRA-EARLY GUARD: Check if we've already processed this song very recently
+    const now = Date.now();
+    if (lastLoadedSongRef.current === currentSong) {
+      const timeSinceLastLoad = now - lastLoadTimeRef.current;
+      if (timeSinceLastLoad < 3000) { // 3 second window
+        console.log(`🔍 ULTRA-EARLY: Skipping - loaded ${timeSinceLastLoad}ms ago`);
+        return;
+      }
+    }
 
     const audio = audioRef.current;
     if (!audio) return;
 
-    // Ensure audio is muted for HTML autoplay to work (browsers allow muted autoplay)
-    if (startMuted) {
-      audio.muted = true;
+    // Clear any pending load timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+      loadTimeoutRef.current = null;
+    }
+
+    // Prevent multiple simultaneous loads - check multiple conditions
+    const now = Date.now();
+    const timeSinceLastLoad = now - lastLoadTimeRef.current;
+    const timeSinceGlobalLock = now - globalLoadLock.lockTime;
+    const timeSinceLastLoadCall = now - lastLoadCallRef.current;
+    
+    // ULTRA-AGGRESSIVE: If we called load() very recently (within 500ms), skip entirely
+    if (timeSinceLastLoadCall < 500) {
+      console.log(`🔍 ULTRA-GUARD: Skipping - load() called ${timeSinceLastLoadCall}ms ago`);
+      return;
     }
     
-    // Set volume
+    // Check global lock first (prevents loads across component re-renders)
+    if (globalLoadLock.isLocked && globalLoadLock.currentSong === currentSong && timeSinceGlobalLock < 2000) {
+      console.log(`🔍 Global lock active - skipping load (locked ${timeSinceGlobalLock}ms ago)`);
+      return;
+    }
+    
+    // AGGRESSIVE: If we loaded this song very recently (within 2000ms), skip to prevent rapid re-renders
+    if (lastLoadedSongRef.current === currentSong && timeSinceLastLoad < 2000) {
+      console.log(`🔍 Skipping rapid reload - loaded ${timeSinceLastLoad}ms ago (threshold: 2000ms)`);
+      return;
+    }
+    
+    // If we're currently loading this exact song, skip
+    if (isLoadingRef.current && lastLoadedSongRef.current === currentSong) {
+      console.log("🔍 Skipping duplicate load - already loading this song");
+      return;
+    }
+
+    // If the song is already loaded and ready, skip reload
+    if (lastLoadedSongRef.current === currentSong && audio.readyState >= 2 && !audio.error) {
+      console.log("🔍 Skipping reload - song already loaded and ready");
+      return;
+    }
+    
+    // Final check: if audio element already has the correct source loaded
+    const currentSrc = audio.currentSrc || '';
+    if (currentSrc && currentSrc.includes(encodeURIComponent(currentSong.split('/').pop() || '')) && audio.readyState > 0 && !audio.error) {
+      console.log("🔍 Audio element already has correct source, skipping");
+      lastLoadedSongRef.current = currentSong;
+      lastLoadTimeRef.current = now;
+      return;
+    }
+
+    // Set global lock
+    globalLoadLock.isLocked = true;
+    globalLoadLock.currentSong = currentSong;
+    globalLoadLock.lockTime = now;
+
+    // Mark as loading BEFORE we do anything else to prevent race conditions
+    isLoadingRef.current = true;
+    lastLoadedSongRef.current = currentSong;
+    lastLoadTimeRef.current = now;
+    
+    // Set initial muted state for autoplay (browsers allow muted autoplay)
+    if (startMuted) {
+      audio.muted = true;
+      startMutedRef.current = true;
+    }
+    
+    // Set initial volume
     audio.volume = isMuted ? 0 : volume;
     
     // Reset any previous errors
@@ -100,8 +205,12 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
 
     // Handle audio load errors
     const handleError = () => {
+      if (!isMountedRef.current) return;
+      isLoadingRef.current = false; // Mark as not loading on error
+      globalLoadLock.isLocked = false; // Release global lock
       const errorCode = audio.error?.code;
       const errorMsg = audio.error?.message || "Unknown error";
+      const failedSrc = audio.currentSrc || audio.src || currentSong;
       
       let detailedError = `Failed to load: ${currentSong.substring(0, 50)}...`;
       
@@ -113,19 +222,24 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         } else {
           detailedError += `\n\n❌ Format Error: The file may not be a valid audio format or may be corrupted.\n\n💡 Solutions:\n1. Verify the file is a valid MP3, MP4, or M4A file\n2. Check the file isn't corrupted\n3. Try playing the file in a media player first`;
         }
+      } else if (errorCode === 2 || errorCode === 3) {
+        // Network error or decode error - likely file not found or encoding issue
+        detailedError += `\n\n❌ File Not Found or Encoding Error (Code: ${errorCode})\n\n💡 Solutions:\n1. Check if the file exists: ${failedSrc}\n2. Verify filename encoding (special characters like é, è need proper encoding)\n3. Try renaming the file without special characters\n4. Check browser console for detailed error`;
       } else {
         detailedError += `\n\nError: ${errorMsg} (Code: ${errorCode})`;
       }
       
       setError(detailedError);
       console.error("Audio load error:", audio.error);
-      console.error("Failed URL:", currentSong);
+      console.error("Failed URL:", failedSrc);
+      console.error("Original path:", currentSong);
       console.error("Error code:", errorCode);
       console.log("\n💡 Troubleshooting tips:");
       console.log("1. Make sure the file exists in public/music/ folder");
       console.log("2. Check the filename is correct (case-sensitive)");
       console.log("3. Verify the file is a valid audio format (MP3, MP4, or M4A)");
-      console.log("4. If file extension doesn't match format, rename it (e.g., .mp4 file should have .mp4 extension)");
+      console.log("4. Check for special characters in filename - they need proper URL encoding");
+      console.log("5. If file extension doesn't match format, rename it (e.g., .mp4 file should have .mp4 extension)");
       
       // Try next song on error (only if playlist has multiple songs)
       if (playlist.length > 1) {
@@ -153,12 +267,13 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       setError(null);
       
       // If audio started muted for autoplay, unmute it now
-      if (startMuted && audio.muted) {
+      if (startMutedRef.current && audio.muted) {
         setTimeout(() => {
           if (audio) {
             audio.muted = false;
             setIsMuted(false);
             setStartMuted(false);
+            startMutedRef.current = false;
             console.log("🎵 🔊 Audio unmuted after autoplay!");
           }
         }, 300);
@@ -183,11 +298,23 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     const pathParts = audioSrc.split('/');
     const folder = pathParts.slice(0, -1).join('/'); // /music
     const filename = pathParts[pathParts.length - 1]; // filename.m4a or .mp3
-    const encodedPath = `${folder}/${encodeURIComponent(filename)}`;
+    
+    // Properly encode the filename (decode first in case it's already encoded, then encode)
+    // This prevents double encoding issues
+    let decodedFilename = filename;
+    try {
+      decodedFilename = decodeURIComponent(filename);
+    } catch (e) {
+      // If already decoded or invalid encoding, use as is
+      decodedFilename = filename;
+    }
+    const encodedFilename = encodeURIComponent(decodedFilename);
+    const encodedPath = `${folder}/${encodedFilename}`;
     
     // Check file extension
     const ext = filename.toLowerCase().split('.').pop();
     console.log(`🎵 Loading audio: ${currentSong} (format: ${ext})`);
+    console.log(`🎵 Encoded path: ${encodedPath}`);
     
     // Function to check if HTML autoplay worked
     // We rely ONLY on HTML autoplay + muted attributes (browsers allow this)
@@ -222,17 +349,27 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     // Add canplaythrough listener to verify file is valid
     // Note: We rely on HTML autoplay + muted attributes (browsers allow this)
     const handleCanPlay = () => {
+      if (!isMountedRef.current) return;
+      isLoadingRef.current = false;
+      globalLoadLock.isLocked = false;
       console.log(`✅ Audio file is valid and ready: ${currentSong}`);
       setError(null);
       // Check if HTML autoplay worked (it should start automatically with muted attribute)
-      setTimeout(() => checkAutoplayStatus(), 100);
+      setTimeout(() => {
+        if (isMountedRef.current) checkAutoplayStatus();
+      }, 100);
     };
     
     const handleCanPlayThrough = () => {
+      if (!isMountedRef.current) return;
+      isLoadingRef.current = false;
+      globalLoadLock.isLocked = false;
       // Audio is fully loaded and can play through
       console.log(`✅ Audio fully loaded: ${currentSong}`);
       // Check if HTML autoplay worked
-      setTimeout(() => checkAutoplayStatus(), 100);
+      setTimeout(() => {
+        if (isMountedRef.current) checkAutoplayStatus();
+      }, 100);
     };
     
     const handleLoadStart = () => {
@@ -242,8 +379,62 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     audio.addEventListener('canplay', handleCanPlay);
     audio.addEventListener('canplaythrough', handleCanPlayThrough);
     audio.addEventListener('loadstart', handleLoadStart);
+    // Note: handleError is already added above with audio.addEventListener("error", handleError)
     
-    audio.load();
+    // Only load if the source has actually changed
+    const currentSrc = audio.currentSrc || '';
+    const encodedFilenameCheck = encodeURIComponent(filename);
+    
+    // Check if we're already loading/loaded this exact file
+    if (currentSrc && currentSrc.includes(encodedFilenameCheck) && audio.readyState > 0 && !audio.error) {
+      console.log("🔍 Audio source unchanged and ready, skipping load()");
+      isLoadingRef.current = false;
+      globalLoadLock.isLocked = false;
+      // Still set up event listeners in case they were removed
+      return;
+    }
+    
+    // Debounce the load call to prevent rapid successive loads
+    const now = Date.now();
+    const timeSinceLastLoadCall = now - lastLoadCallRef.current;
+    
+    // AGGRESSIVE: If we called load() very recently (within 200ms), skip entirely
+    if (timeSinceLastLoadCall < 200) {
+      console.log(`🔍 Skipping load() call - last call was ${timeSinceLastLoadCall}ms ago`);
+      isLoadingRef.current = false;
+      globalLoadLock.isLocked = false;
+      return;
+    }
+    
+    loadTimeoutRef.current = setTimeout(() => {
+      if (!isMountedRef.current || !audioRef.current) {
+        globalLoadLock.isLocked = false;
+        return;
+      }
+      const audioElement = audioRef.current;
+      
+      // Triple-check we still need to load
+      const timeSinceLastCall = Date.now() - lastLoadCallRef.current;
+      if (timeSinceLastCall < 200) {
+        console.log("🔍 Load call canceled - another load happened during debounce");
+        isLoadingRef.current = false;
+        globalLoadLock.isLocked = false;
+        return;
+      }
+      
+      if (lastLoadedSongRef.current === currentSong && audioElement.readyState >= 2 && !audioElement.error) {
+        console.log("🔍 Song already loaded during debounce, skipping");
+        isLoadingRef.current = false;
+        globalLoadLock.isLocked = false;
+        return;
+      }
+      
+      // Mark that we're calling load()
+      lastLoadCallRef.current = Date.now();
+      loadCallCountRef.current += 1;
+      console.log(`🎵 Calling audio.load() for: ${currentSong} (call #${loadCallCountRef.current})`);
+      audioElement.load();
+    }, 100); // 100ms debounce (increased from 50ms)
 
     // Check if HTML autoplay worked after a brief delay
     const timer1 = setTimeout(() => {
@@ -263,6 +454,12 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
     });
 
     return () => {
+      isLoadingRef.current = false;
+      globalLoadLock.isLocked = false;
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
       clearTimeout(timer1);
       clearTimeout(timer2);
       // Remove interaction listeners
@@ -277,7 +474,20 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       audio.removeEventListener('canplaythrough', handleCanPlayThrough);
       audio.removeEventListener('loadstart', handleLoadStart);
     };
-  }, [currentSong, playlist.length, isPlaying, volume, isMuted, type, handleFirstInteraction]);
+  }, [currentSong, playlist.length, type]); // Removed handleFirstInteraction - it's stable now with empty deps
+
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      globalLoadLock.isLocked = false;
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
+        loadTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const playNext = () => {
     if (playlist.length <= 1) return;
@@ -319,10 +529,11 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         wasPlayingBeforeHidden.current = false;
         
         // Unmute if it was muted for autoplay
-        if (audio.muted && startMuted) {
+        if (audio.muted && startMutedRef.current) {
           audio.muted = false;
           setStartMuted(false);
           setIsMuted(false);
+          startMutedRef.current = false;
         }
         
         // Check if audio is ready to play
@@ -416,10 +627,11 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
             if (audioCheck && audioCheck.paused) {
               try {
                 // Unmute if it was muted for autoplay
-                if (audioCheck.muted && startMuted) {
+                if (audioCheck.muted && startMutedRef.current) {
                   audioCheck.muted = false;
                   setStartMuted(false);
                   setIsMuted(false);
+                  startMutedRef.current = false;
                 }
                 // Check if audio is ready to play
                 if (audioCheck.readyState < 2) {
@@ -583,10 +795,11 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         if (audio && audio.paused) {
           const resumeMusic = async () => {
             try {
-              if (audio.muted && startMuted) {
+              if (audio.muted && startMutedRef.current) {
                 audio.muted = false;
                 setStartMuted(false);
                 setIsMuted(false);
+                startMutedRef.current = false;
               }
               if (audio.readyState < 2) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -625,6 +838,40 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       console.log("🧹 Event listeners cleaned up");
     };
   }, []);
+
+  // Memoize audio source to prevent recalculation on every render
+  const audioSource = useMemo(() => {
+    if (!currentSong) return null;
+    
+    let audioSrc = currentSong;
+    // Ensure path starts with / for absolute path from public folder
+    if (!audioSrc.startsWith('/')) {
+      audioSrc = `/${audioSrc}`;
+    }
+    const pathParts = audioSrc.split('/');
+    const folder = pathParts.slice(0, -1).join('/');
+    const filename = pathParts[pathParts.length - 1];
+    
+    // Use Vite's BASE_URL to properly handle GitHub Pages base path
+    // BASE_URL already includes the trailing slash (e.g., '/our-special-day/')
+    const baseUrl = import.meta.env.BASE_URL;
+    // Remove leading slash from folder if present, then combine with base
+    const cleanFolder = folder.startsWith('/') ? folder.slice(1) : folder;
+    const encodedPath = `${baseUrl}${cleanFolder}/${encodeURIComponent(filename)}`;
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    // Determine MIME type based on extension
+    let mimeType = 'audio/mpeg';
+    if (ext === 'm4a') {
+      mimeType = 'audio/mp4'; // M4A uses MP4 container
+    } else if (ext === 'mp4') {
+      mimeType = 'audio/mp4';
+    } else if (ext === 'mp3') {
+      mimeType = 'audio/mpeg';
+    }
+    
+    return { src: encodedPath, type: mimeType };
+  }, [currentSong]);
 
   if (!currentSong) return null;
 
@@ -684,39 +931,10 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         autoPlay
         muted={startMuted}
       >
-        {/* Use source element for better format detection */}
-        {currentSong && (() => {
-          let audioSrc = currentSong;
-          // Ensure path starts with / for absolute path from public folder
-          if (!audioSrc.startsWith('/')) {
-            audioSrc = `/${audioSrc}`;
-          }
-          const pathParts = audioSrc.split('/');
-          const folder = pathParts.slice(0, -1).join('/');
-          const filename = pathParts[pathParts.length - 1];
-          
-          // Use Vite's BASE_URL to properly handle GitHub Pages base path
-          // BASE_URL already includes the trailing slash (e.g., '/our-special-day/')
-          const baseUrl = import.meta.env.BASE_URL;
-          // Remove leading slash from folder if present, then combine with base
-          const cleanFolder = folder.startsWith('/') ? folder.slice(1) : folder;
-          const encodedPath = `${baseUrl}${cleanFolder}/${encodeURIComponent(filename)}`;
-          const ext = filename.toLowerCase().split('.').pop();
-          
-          // Determine MIME type based on extension
-          let mimeType = 'audio/mpeg';
-          if (ext === 'm4a') {
-            mimeType = 'audio/mp4'; // M4A uses MP4 container
-          } else if (ext === 'mp4') {
-            mimeType = 'audio/mp4';
-          } else if (ext === 'mp3') {
-            mimeType = 'audio/mpeg';
-          }
-          
-          return (
-            <source src={encodedPath} type={mimeType} />
-          );
-        })()}
+        {/* Use source element for better format detection - only render if source changed */}
+        {audioSource && (
+          <source src={audioSource.src} type={audioSource.type} />
+        )}
       </audio>
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
@@ -811,4 +1029,13 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
   );
 };
 
-export default BackgroundMusic;
+// Memoize component to prevent unnecessary re-renders
+export default memo(BackgroundMusic, (prevProps, nextProps) => {
+  // Only re-render if these props actually change
+  return (
+    prevProps.src === nextProps.src &&
+    prevProps.volume === nextProps.volume &&
+    prevProps.shuffle === nextProps.shuffle &&
+    prevProps.type === nextProps.type
+  );
+});
