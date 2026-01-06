@@ -95,8 +95,16 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (!errorMessage.includes('play()') && !errorMessage.includes('interaction') && !errorMessage.includes('NotAllowedError')) {
           console.error("Failed to play audio:", error);
+          // Only show error for non-autoplay errors
+          setError("Unable to play music. Please try again.");
+          // Auto-dismiss after 3 seconds
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setError(null);
+            }
+          }, 3000);
         }
-        setError("Could not play audio. Browser may require user interaction.");
+        // Don't show error for autoplay/interaction errors - they're expected
       }
     }
   }, []); // Empty deps - use refs instead to avoid re-renders
@@ -212,39 +220,136 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
       const errorMsg = audio.error?.message || "Unknown error";
       const failedSrc = audio.currentSrc || audio.src || currentSong;
       
-      let detailedError = `Failed to load: ${currentSong.substring(0, 50)}...`;
-      
-      // Provide more specific error messages
-      if (errorCode === 4) { // MEDIA_ELEMENT_ERROR: Format error
-        const ext = currentSong.toLowerCase().split('.').pop();
-        if (ext === 'm4a' || ext === 'mp4') {
-          detailedError += `\n\n❌ M4A Format Error: Your browser cannot decode this M4A file's codec.\n\n💡 Possible solutions:\n1. Try a different browser (Chrome/Edge usually have better M4A support)\n2. The file may need to be re-encoded with a compatible codec\n3. Convert to MP3 for universal compatibility (see FIX_MUSIC_NOW.md)`;
-        } else {
-          detailedError += `\n\n❌ Format Error: The file may not be a valid audio format or may be corrupted.\n\n💡 Solutions:\n1. Verify the file is a valid MP3, MP4, or M4A file\n2. Check the file isn't corrupted\n3. Try playing the file in a media player first`;
-        }
-      } else if (errorCode === 2 || errorCode === 3) {
-        // Network error or decode error - likely file not found or encoding issue
-        detailedError += `\n\n❌ File Not Found or Encoding Error (Code: ${errorCode})\n\n💡 Solutions:\n1. Check if the file exists: ${failedSrc}\n2. Verify filename encoding (special characters like é, è need proper encoding)\n3. Try renaming the file without special characters\n4. Check browser console for detailed error`;
-      } else {
-        detailedError += `\n\nError: ${errorMsg} (Code: ${errorCode})`;
-      }
-      
-      setError(detailedError);
+      // Log error for debugging
       console.error("Audio load error:", audio.error);
       console.error("Failed URL:", failedSrc);
       console.error("Original path:", currentSong);
       console.error("Error code:", errorCode);
-      console.log("\n💡 Troubleshooting tips:");
-      console.log("1. Make sure the file exists in public/music/ folder");
-      console.log("2. Check the filename is correct (case-sensitive)");
-      console.log("3. Verify the file is a valid audio format (MP3, MP4, or M4A)");
-      console.log("4. Check for special characters in filename - they need proper URL encoding");
-      console.log("5. If file extension doesn't match format, rename it (e.g., .mp4 file should have .mp4 extension)");
       
-      // Try next song on error (only if playlist has multiple songs)
-      if (playlist.length > 1) {
-        setTimeout(() => playNext(), 2000);
-      }
+      // Don't show error immediately - wait a bit to see if it recovers
+      // This handles transient network issues (like when accessing from Google Drive)
+      setTimeout(() => {
+        if (!isMountedRef.current || !audioRef.current) return;
+        
+        const audioCheck = audioRef.current;
+        
+        // Check multiple recovery indicators:
+        // 1. No error anymore
+        // 2. ReadyState improved (has data)
+        // 3. Audio is actually playing
+        // 4. Duration is available (file loaded)
+        const hasRecovered = 
+          !audioCheck.error || 
+          audioCheck.readyState >= 2 || 
+          !audioCheck.paused ||
+          (audioCheck.duration && audioCheck.duration > 0);
+        
+        if (hasRecovered) {
+          console.log("✅ Audio recovered, not showing error");
+          setError(null);
+          return;
+        }
+        
+        // Only show error for persistent issues (not transient network problems)
+        // Error code 1 = MEDIA_ERR_ABORTED (user aborted) - don't show
+        // Error code 2 = MEDIA_ERR_NETWORK - might be transient, check again
+        if (errorCode === 1 || errorCode === undefined) {
+          // User aborted, browser optimization, or undefined error - don't show error
+          console.log(`🔍 Error code ${errorCode || 'undefined'} (aborted/optimization) - not showing error to user`);
+          setError(null);
+          return;
+        }
+        
+        // For network errors, only show if it persists after retry
+        if (errorCode === 2) {
+          // Network error - might be transient (especially on mobile/Google Drive)
+          // Wait longer and check multiple times before showing error
+          console.log("🔄 Network error detected, waiting for recovery...");
+          
+          let retryCount = 0;
+          const maxRetries = 3;
+          const checkRecovery = () => {
+            if (!isMountedRef.current || !audioRef.current) return;
+            
+            const audioRetry = audioRef.current;
+            const recovered = 
+              !audioRetry.error || 
+              audioRetry.readyState >= 2 || 
+              !audioRetry.paused ||
+              (audioRetry.duration && audioRetry.duration > 0);
+            
+            if (recovered) {
+              console.log("✅ Audio recovered after network error");
+              setError(null);
+              return;
+            }
+            
+            retryCount++;
+            if (retryCount < maxRetries) {
+              // Check again after delay
+              setTimeout(checkRecovery, 1000);
+            } else {
+              // Still failing after multiple checks - show error
+              console.log("⚠️ Network error persists after retries");
+              setError("Unable to load music. Please check your internet connection.");
+              // Auto-dismiss after 5 seconds
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  setError(null);
+                }
+              }, 5000);
+              // Try next song on error (only if playlist has multiple songs)
+              if (playlist.length > 1) {
+                setTimeout(() => playNext(), 2000);
+              }
+            }
+          };
+          
+          // Start checking after initial delay
+          setTimeout(checkRecovery, 1000);
+          return;
+        }
+        
+        // For other errors (format errors, etc.), show error but be less aggressive
+        let detailedError = `Unable to play music`;
+        
+        if (errorCode === 4) { // MEDIA_ELEMENT_ERROR: Format error
+          const ext = currentSong.toLowerCase().split('.').pop();
+          if (ext === 'm4a' || ext === 'mp4') {
+            detailedError = `Music format not supported. Please try a different browser.`;
+          } else {
+            detailedError = `Music file format error. Please check the file.`;
+          }
+        } else if (errorCode === 3) {
+          // Decode error
+          detailedError = `Music file cannot be decoded. The file may be corrupted.`;
+        } else {
+          // Unknown error - show generic message
+          detailedError = `Unable to play music. Please try refreshing the page.`;
+        }
+        
+        // Only show error if audio is definitely not working
+        // Double-check before showing
+        if (audioCheck.readyState === 0 && audioCheck.error) {
+          setError(detailedError);
+          
+          // Auto-dismiss error after 5 seconds
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setError(null);
+            }
+          }, 5000);
+          
+          // Try next song on error (only if playlist has multiple songs)
+          if (playlist.length > 1) {
+            setTimeout(() => playNext(), 2000);
+          }
+        } else {
+          // Audio might still be loading, don't show error yet
+          console.log("🔍 Audio might still be loading, not showing error");
+          setError(null);
+        }
+      }, 1000); // Wait 1 second before showing error to allow recovery (increased from 500ms)
     };
 
     // Handle when song ends - play next
@@ -551,7 +656,9 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
         if (!errorMessage.includes('play()') && !errorMessage.includes('interaction')) {
           console.error("Failed to play audio:", error);
         }
-        setError("Could not play audio. Browser may require user interaction.");
+        // Don't show error for autoplay/interaction errors - they're expected and handled by the prompt
+        // Only log for debugging
+        console.log("ℹ️ Autoplay blocked - user will see prompt to start music");
       }
     }
   };
@@ -946,10 +1053,11 @@ const BackgroundMusic = ({ src, volume = 0.3, shuffle = true, type = "audio" }: 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-destructive/90 text-card px-3 py-2 rounded-lg text-xs flex items-center gap-2 max-w-xs"
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-destructive/90 text-card px-3 py-2 rounded-lg text-xs flex items-center gap-2 max-w-xs shadow-lg"
             >
-              <AlertCircle className="w-4 h-4" />
-              <span>{error}</span>
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span className="break-words">{error}</span>
             </motion.div>
           )}
           
