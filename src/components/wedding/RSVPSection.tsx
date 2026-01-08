@@ -437,7 +437,7 @@ const RSVPSection = ({ noLimits = false }: RSVPSectionProps = {}) => {
             className="mt-6 md:mt-8 px-6 md:px-8 py-4 md:py-6 border-2 border-gold/50 bg-gold/10 rounded-lg shadow-lg"
           >
             <p className="text-lg md:text-xl lg:text-2xl font-body text-foreground font-semibold text-center leading-relaxed">
-              {t("rsvp.thankYouMessage")}
+              👼😴 {t("rsvp.thankYouMessage")}
             </p>
           </motion.div>
           {submittedAttendance === "attending" && submittedGuestsWithTables.length > 0 && (
