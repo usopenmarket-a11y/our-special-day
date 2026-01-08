@@ -424,14 +424,16 @@ const RSVPSection = () => {
               ? t("rsvp.attendingMessage")
               : t("rsvp.notAttendingMessage")}
           </motion.p>
-          <motion.p
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
-            className="text-xl md:text-2xl font-body text-gold font-semibold mt-6 md:mt-8"
+            className="mt-6 md:mt-8 px-6 md:px-8 py-4 md:py-6 border-2 border-gold/50 bg-gold/10 rounded-lg shadow-lg"
           >
-            {t("rsvp.thankYouMessage")}
-          </motion.p>
+            <p className="text-lg md:text-xl lg:text-2xl font-body text-foreground font-semibold text-center leading-relaxed">
+              {t("rsvp.thankYouMessage")}
+            </p>
+          </motion.div>
           {submittedAttendance === "attending" && submittedGuestsWithTables.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}

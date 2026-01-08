@@ -140,17 +140,19 @@ const DetailsSection = () => {
           </motion.div>
         </div>
 
-        {/* Good Night Message */}
+        {/* Children Message */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="text-center mt-12 sm:mt-16"
+          className="text-center mt-12 sm:mt-16 max-w-3xl mx-auto px-4"
         >
-          <p className="text-lg sm:text-xl md:text-2xl font-body text-muted-foreground italic max-w-2xl mx-auto px-4">
-            {t("footer.goodNightForChildren")}
-          </p>
+          <div className="px-6 md:px-8 py-4 md:py-6 border-2 border-gold/50 bg-gold/10 rounded-lg shadow-lg">
+            <p className="text-lg sm:text-xl md:text-2xl font-body text-foreground font-semibold leading-relaxed">
+              {t("footer.goodNightForChildren")}
+            </p>
+          </div>
         </motion.div>
       </div>
     </section>
