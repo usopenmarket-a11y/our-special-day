@@ -32,16 +32,16 @@ const Index = () => {
         <meta property="og:title" content={`${brideName} & ${groomName} | Wedding Invitation`} />
         <meta property="og:description" content={`You're invited to celebrate the wedding of ${brideName} & ${groomName}. RSVP and join us for our special day.`} />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content={`${typeof window !== 'undefined' ? window.location.origin + import.meta.env.BASE_URL + 'background.png' : ''}`} />
+        <meta property="og:image" content={`${typeof window !== 'undefined' ? window.location.origin + import.meta.env.BASE_URL + 'background.jpg' : ''}`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:type" content="image/jpeg" />
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${brideName} & ${groomName} | Wedding Invitation`} />
         <meta name="twitter:description" content={`You're invited to celebrate the wedding of ${brideName} & ${groomName}. RSVP and join us for our special day.`} />
-        <meta name="twitter:image" content={`${typeof window !== 'undefined' ? window.location.origin + import.meta.env.BASE_URL + 'background.png' : ''}`} />
+        <meta name="twitter:image" content={`${typeof window !== 'undefined' ? window.location.origin + import.meta.env.BASE_URL + 'background.jpg' : ''}`} />
       </Helmet>
 
       <div className="min-h-screen">
