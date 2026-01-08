@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Access</title>
+</head>
+<body>
+    <h1>Testing Background Image Access</h1>
+    <p>If you can see the image below, it's accessible:</p>
+    <img src="https://fadyandsandra-specialday.github.io/our-special-day/background.png" 
+         alt="Background Image" 
+         style="max-width: 500px; border: 2px solid #000;" />
+    <hr>
+    <h2>Meta Tags Test</h2>
+    <p>Open this page's source (Ctrl+U) and check if the og:image meta tag is present.</p>
+    <script>
+        // Test if image loads
+        const img = new Image();
+        img.onload = function() {
+            console.log('✅ Image loaded successfully!');
+            document.body.innerHTML += '<p style="color: green;">✅ Image is accessible!</p>';
+        };
+        img.onerror = function() {
+            console.error('❌ Image failed to load');
+            document.body.innerHTML += '<p style="color: red;">❌ Image is NOT accessible at the URL!</p>';
+        };
+        img.src = 'https://fadyandsandra-specialday.github.io/our-special-day/background.png';
+    </script>
+</body>
+</html>
+
