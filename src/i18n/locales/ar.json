@@ -55,7 +55,8 @@
     "searchesRemaining": "{{count}} عمليات بحث متبقية اليوم",
     "searchError": "فشل البحث. يرجى المحاولة مرة أخرى.",
     "tableNumberLabel": "رقم طاولتك",
-    "tableNumberIs": "رقم الطاولة هو"
+    "tableNumberIs": "رقم الطاولة هو",
+    "unlimitedMode": "وضع غير محدود"
   },
   "details": {
     "joinUs": "انضم إلينا",

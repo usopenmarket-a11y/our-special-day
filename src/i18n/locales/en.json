@@ -55,7 +55,8 @@
     "searchesRemaining": "{{count}} searches remaining today",
     "searchError": "Failed to search. Please try again.",
     "tableNumberLabel": "Your table number",
-    "tableNumberIs": "table number is"
+    "tableNumberIs": "table number is",
+    "unlimitedMode": "Unlimited Mode"
   },
   "details": {
     "joinUs": "Join Us",

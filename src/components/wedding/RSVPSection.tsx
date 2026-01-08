@@ -55,7 +55,11 @@ const getRemainingSearches = (): number => {
   return Math.max(0, MAX_SEARCHES_PER_DAY - count);
 };
 
-const RSVPSection = () => {
+interface RSVPSectionProps {
+  noLimits?: boolean;
+}
+
+const RSVPSection = ({ noLimits = false }: RSVPSectionProps = {}) => {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
   const [selectedGuests, setSelectedGuests] = useState<GuestInfo[]>([]);
@@ -68,7 +72,7 @@ const RSVPSection = () => {
   const [submittedAttendance, setSubmittedAttendance] = useState<"attending" | "not-attending" | "">("");
   const [submittedTableNumbers, setSubmittedTableNumbers] = useState<string[]>([]);
   const [submittedGuestsWithTables, setSubmittedGuestsWithTables] = useState<Array<{ name: string; tableNumber: string }>>([]);
-  const [searchCount, setSearchCount] = useState(getSearchCount().count);
+  const [searchCount, setSearchCount] = useState(noLimits ? 0 : getSearchCount().count);
   const [searchLanguage, setSearchLanguage] = useState<'en' | 'ar'>('en');
   const { toast } = useToast();
 
@@ -83,8 +87,8 @@ const RSVPSection = () => {
       return;
     }
 
-    // Check rate limit
-    if (!canSearch()) {
+    // Check rate limit (skip if noLimits is true)
+    if (!noLimits && !canSearch()) {
       toast({
         title: t("rsvp.searchLimitReached"),
         description: t("rsvp.searchLimitMessage"),
@@ -190,9 +194,11 @@ const RSVPSection = () => {
       // Clear selected guests when performing a new search to avoid confusion
       setSelectedGuests([]);
       
-      // Increment search count
-      const newCount = incrementSearchCount();
-      setSearchCount(newCount);
+      // Increment search count (skip if noLimits is true)
+      if (!noLimits) {
+        const newCount = incrementSearchCount();
+        setSearchCount(newCount);
+      }
       
     } catch (err) {
       console.error("Failed to fetch guests:", err);
@@ -501,13 +507,18 @@ const RSVPSection = () => {
               <div className="space-y-3 md:space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <Label className="text-sm md:text-base font-display">{t("rsvp.selectName")}</Label>
-                  {searchCount > 0 && (
+                  {!noLimits && searchCount > 0 && (
                     <span className="text-xs text-muted-foreground font-body">
                       {(() => {
                         const remaining = getRemainingSearches();
                         const translated = t("rsvp.searchesRemaining", { count: remaining });
                         return isArabic ? translated.replace(/\d+/g, (num) => toArabicNumerals(parseInt(num, 10), true)) : translated;
                       })()}
+                    </span>
+                  )}
+                  {noLimits && (
+                    <span className="text-xs text-gold font-body font-semibold">
+                      {t("rsvp.unlimitedMode") || "Unlimited Mode"}
                     </span>
                   )}
                 </div>
@@ -525,13 +536,13 @@ const RSVPSection = () => {
                         }
                       }}
                       className="font-body h-11 md:h-12 text-base px-3 sm:px-4"
-                      disabled={!canSearch()}
+                      disabled={!noLimits && !canSearch()}
                     />
                   </div>
                   <Button
                     type="button"
                     onClick={handleSearch}
-                    disabled={isLoading || !canSearch() || searchQuery.length < 2}
+                    disabled={isLoading || (!noLimits && !canSearch()) || searchQuery.length < 2}
                     className="h-11 md:h-12 px-6 bg-gold hover:bg-gold/90 text-primary-foreground text-base font-medium"
                   >
                     {isLoading ? (
@@ -548,7 +559,7 @@ const RSVPSection = () => {
                     )}
                   </Button>
                 </div>
-                {!canSearch() && (
+                {!noLimits && !canSearch() && (
                   <p className="text-sm text-rose font-body">
                     {t("rsvp.searchLimitReached")}
                   </p>
