@@ -150,7 +150,7 @@ const DetailsSection = () => {
         >
           <div className="px-6 md:px-8 py-4 md:py-6 border-2 border-gold/50 bg-gold/10 rounded-lg shadow-lg">
             <p className="text-lg sm:text-xl md:text-2xl font-body text-foreground font-semibold leading-relaxed">
-              👼😴 {t("footer.goodNightForChildren")}
+              👼 {t("footer.goodNightForChildren")}
             </p>
           </div>
         </motion.div>
